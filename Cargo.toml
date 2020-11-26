@@ -1,0 +1,10 @@
+[package]
+name = "hinasmawo"
+version = "0.1.0"
+authors = ["Dirkjan Ochtman <dirkjan@ochtman.nl>"]
+edition = "2018"
+
+[dependencies]
+ahash = "0.6.1"
+rand = { version = "0.7.3", features = ["small_rng"] }
+ordered-float = "2.0"
