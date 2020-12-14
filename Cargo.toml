@@ -9,3 +9,4 @@ ahash = "0.6.1"
 ordered-float = "2.0"
 rand = { version = "0.7.3", features = ["small_rng"] }
 rayon = "1.5"
+serde = { version = "1.0.118", features = ["derive"], optional = true }

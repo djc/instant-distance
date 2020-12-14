@@ -6,7 +6,10 @@ use ahash::AHashSet as HashSet;
 use ordered_float::OrderedFloat;
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct Hnsw<P> {
     ef_search: usize,
     points: Vec<P>,
@@ -400,6 +403,7 @@ trait Layer {
     fn nodes(&self) -> &[Self::Node];
 }
 
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Clone, Copy, Debug, Default)]
 struct UpperNode {
     /// The nearest neighbors on this layer
@@ -424,6 +428,7 @@ impl Node for UpperNode {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Clone, Copy, Debug, Default)]
 struct ZeroNode {
     /// The nearest neighbors on this layer
@@ -523,6 +528,7 @@ struct Candidate {
 /// References a `Point` in the `Hnsw`
 ///
 /// This can be used to index into the `Hnsw` to refer to the `Point` data.
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct PointId(usize);
 
