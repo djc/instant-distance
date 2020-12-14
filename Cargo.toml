@@ -7,4 +7,5 @@ edition = "2018"
 [dependencies]
 ahash = "0.6.1"
 rand = { version = "0.7.3", features = ["small_rng"] }
+rayon = "1.5"
 ordered-float = "2.0"
