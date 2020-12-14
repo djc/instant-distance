@@ -119,7 +119,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "hinasmawo"
+name = "instant-index"
 version = "0.1.0"
 dependencies = [
  "ahash",
