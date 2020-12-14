@@ -179,6 +179,8 @@ pub struct Search {
     nearest: Vec<Candidate>,
     /// Maximum number of nearest neighbors to retain (`ef` in the paper)
     num: usize,
+    /// Current furthest node in `nearest`
+    furthest: OrderedFloat<f32>,
 }
 
 impl Search {
@@ -200,32 +202,32 @@ impl Search {
 
         let other = &points[pid];
         let distance = OrderedFloat::from(point.distance(other));
-        if self.nearest.len() >= self.num {
-            if let Some(found) = self.nearest.last() {
-                if distance > found.distance {
-                    return;
-                }
-            }
+        if self.nearest.len() >= self.num && distance > self.furthest {
+            return;
         }
 
-        if self.nearest.len() > self.num {
-            self.nearest.pop();
+        if self.nearest.len() > self.num * 2 {
+            self.nearest.sort_unstable();
+            self.nearest.truncate(self.num);
+            self.furthest = self.nearest.last().unwrap().distance;
         }
 
         let new = Candidate { distance, pid };
-        let idx = self.candidates.binary_search(&new).unwrap_or_else(|e| e);
-        self.candidates.insert(idx, new);
-
-        let idx = self.nearest.binary_search(&new).unwrap_or_else(|e| e);
-        self.nearest.insert(idx, new);
+        self.candidates.push(new);
+        self.nearest.push(new);
+        self.furthest = max(self.furthest, distance);
     }
 
     /// Lower the search to the next lower level
     ///
     /// Re-initialize the `Search`: `nearest`, the output `W` from the last round, now becomes
     /// the set of enter points, which we use to initialize both `candidates` and `visited`.
+    ///
+    /// Invariant: `nearest` should be sorted before this is called. This is generally the case
+    /// because `Layer::search()` is always called right before calling `cull()`.
     fn cull(&mut self) {
         self.nearest.truncate(self.num); // Limit size of the set of nearest neighbors
+        self.furthest = self.nearest.last().unwrap().distance;
         self.candidates.clear();
         self.candidates.extend(&self.nearest);
         self.visited.clear();
@@ -240,6 +242,7 @@ impl Default for Search {
             candidates: Vec::new(),
             nearest: Vec::new(),
             num: 1,
+            furthest: OrderedFloat::from(f32::INFINITY),
         }
     }
 }
@@ -328,10 +331,14 @@ trait Layer {
                 }
             }
 
-            for pid in self.nodes()[candidate.pid.0 as usize].nearest_iter().take(num) {
+            let node = &self.nodes()[candidate.pid.0 as usize];
+            for pid in node.nearest_iter().take(num) {
                 search.push(pid, point, points);
             }
         }
+
+        search.nearest.sort_unstable();
+        search.nearest.truncate(search.num);
     }
 
     /// Insert new node in this layer
@@ -370,8 +377,7 @@ trait Layer {
                         _ => return Ordering::Greater,
                     };
 
-                    let third_distance = OrderedFloat::from(old.distance(&points[third.0 as usize]));
-                    distance.cmp(&third_distance)
+                    distance.cmp(&old.distance(&points[third.0 as usize]).into())
                 })
                 .unwrap_or_else(|e| e);
 
