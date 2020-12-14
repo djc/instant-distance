@@ -520,10 +520,6 @@ struct Candidate {
     pid: PointId,
 }
 
-/// References a node in a particular layer (usually the same layer)
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-struct NodeId(usize);
-
 /// References a `Point` in the `Hnsw`
 ///
 /// This can be used to index into the `Hnsw` to refer to the `Point` data.
