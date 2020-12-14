@@ -19,7 +19,7 @@ pub struct Hnsw<P> {
 
 impl<P> Hnsw<P>
 where
-    P: Point + std::fmt::Debug,
+    P: Point,
 {
     pub fn new(points: &[P], ef_construction: usize, ef_search: usize) -> (Self, Vec<PointId>) {
         if points.is_empty() {
