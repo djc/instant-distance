@@ -621,16 +621,12 @@ mod tests {
 
     #[test]
     fn basic() {
-        let (hnsw, pids) = Hnsw::new(
-            &[
-                Point(0.1, 0.4),
-                Point(-0.324, 0.543),
-                Point(0.87, -0.33),
-                Point(0.452, 0.932),
-            ],
-            100,
-            100,
-        );
+        let (hnsw, pids) = Hnsw::<Point>::builder().build(&[
+            Point(0.1, 0.4),
+            Point(-0.324, 0.543),
+            Point(0.87, -0.33),
+            Point(0.452, 0.932),
+        ]);
 
         let mut search = Search::default();
         let mut results = vec![PointId::invalid()];
