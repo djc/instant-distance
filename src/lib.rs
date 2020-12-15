@@ -3,6 +3,8 @@ use std::hash::Hash;
 use std::ops::Index;
 
 use ahash::AHashSet as HashSet;
+#[cfg(feature = "indicatif")]
+use indicatif::ProgressBar;
 use ordered_float::OrderedFloat;
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
@@ -28,6 +30,8 @@ where
     fn new(points: &[P], builder: Builder) -> (Self, Vec<PointId>) {
         let ef_search = builder.ef_search.unwrap_or(100);
         let ef_construction = builder.ef_construction.unwrap_or(100);
+        #[cfg(feature = "indicatif")]
+        let progress = builder.progress;
 
         if points.is_empty() {
             return (
@@ -99,6 +103,13 @@ where
         for (layer, range) in ranges {
             let num = if layer.0 > 0 { M } else { M * 2 };
             for &(_, pid) in &nodes[range] {
+                #[cfg(feature = "indicatif")]
+                if pid.0 % 10_000 == 0 {
+                    if let Some(bar) = &progress {
+                        bar.set_position(pid.0 as u64);
+                    }
+                }
+
                 search.reset();
                 let point = &points[pid];
                 search.push(PointId(0), &points[pid], &points);
@@ -126,6 +137,11 @@ where
                 }));
                 layers[layer.0 - 1] = upper;
             }
+        }
+
+        #[cfg(feature = "indicatif")]
+        if let Some(bar) = progress {
+            bar.finish();
         }
 
         (
@@ -258,6 +274,8 @@ impl Default for Search {
 pub struct Builder {
     ef_search: Option<usize>,
     ef_construction: Option<usize>,
+    #[cfg(feature = "indicatif")]
+    progress: Option<ProgressBar>,
 }
 
 impl Builder {
@@ -271,6 +289,12 @@ impl Builder {
         if self.ef_construction.is_none() {
             self.ef_construction = Some(ef);
         }
+        self
+    }
+
+    #[cfg(feature = "indicatif")]
+    pub fn progress(mut self, bar: ProgressBar) -> Self {
+        self.progress = Some(bar);
         self
     }
 

@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 ahash = "0.6.1"
+indicatif = { version = "0.15", optional = true }
 ordered-float = "2.0"
 rand = { version = "0.7.3", features = ["small_rng"] }
 rayon = "1.5"
