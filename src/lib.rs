@@ -283,30 +283,6 @@ impl Builder {
     }
 }
 
-impl<P> Index<PointId> for Hnsw<P> {
-    type Output = P;
-
-    fn index(&self, index: PointId) -> &Self::Output {
-        &self.points[index.0 as usize]
-    }
-}
-
-impl<P: Point> Index<PointId> for Vec<P> {
-    type Output = P;
-
-    fn index(&self, index: PointId) -> &Self::Output {
-        &self[index.0 as usize]
-    }
-}
-
-impl<P: Point> Index<PointId> for [P] {
-    type Output = P;
-
-    fn index(&self, index: PointId) -> &Self::Output {
-        &self[index.0 as usize]
-    }
-}
-
 impl Layer for Vec<ZeroNode> {
     const LINKS: usize = M * 2;
 
@@ -587,6 +563,30 @@ impl PointId {
 impl Default for PointId {
     fn default() -> Self {
         PointId::invalid()
+    }
+}
+
+impl<P> Index<PointId> for Hnsw<P> {
+    type Output = P;
+
+    fn index(&self, index: PointId) -> &Self::Output {
+        &self.points[index.0 as usize]
+    }
+}
+
+impl<P: Point> Index<PointId> for Vec<P> {
+    type Output = P;
+
+    fn index(&self, index: PointId) -> &Self::Output {
+        &self[index.0 as usize]
+    }
+}
+
+impl<P: Point> Index<PointId> for [P] {
+    type Output = P;
+
+    fn index(&self, index: PointId) -> &Self::Output {
+        &self[index.0 as usize]
     }
 }
 
