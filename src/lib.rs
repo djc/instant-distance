@@ -26,12 +26,8 @@ where
     }
 
     fn new(points: &[P], builder: Builder) -> (Self, Vec<PointId>) {
-        let Builder {
-            ef_search,
-            ef_construction,
-        } = builder;
-        let ef_search = ef_search.unwrap_or(100);
-        let ef_construction = ef_construction.unwrap_or(100);
+        let ef_search = builder.ef_search.unwrap_or(100);
+        let ef_construction = builder.ef_construction.unwrap_or(100);
 
         if points.is_empty() {
             return (
