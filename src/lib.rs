@@ -21,7 +21,18 @@ impl<P> Hnsw<P>
 where
     P: Point,
 {
-    pub fn new(points: &[P], ef_construction: usize, ef_search: usize) -> (Self, Vec<PointId>) {
+    pub fn builder() -> Builder {
+        Builder::default()
+    }
+
+    fn new(points: &[P], builder: Builder) -> (Self, Vec<PointId>) {
+        let Builder {
+            ef_search,
+            ef_construction,
+        } = builder;
+        let ef_search = ef_search.unwrap_or(100);
+        let ef_construction = ef_construction.unwrap_or(100);
+
         if points.is_empty() {
             return (
                 Self {
@@ -244,6 +255,31 @@ impl Default for Search {
             num: 1,
             furthest: OrderedFloat::from(f32::INFINITY),
         }
+    }
+}
+
+#[derive(Default)]
+pub struct Builder {
+    ef_search: Option<usize>,
+    ef_construction: Option<usize>,
+}
+
+impl Builder {
+    pub fn ef_construction(mut self, ef_construction: usize) -> Self {
+        self.ef_construction = Some(ef_construction);
+        self
+    }
+
+    pub fn ef(mut self, ef: usize) -> Self {
+        self.ef_search = Some(ef);
+        if self.ef_construction.is_none() {
+            self.ef_construction = Some(ef);
+        }
+        self
+    }
+
+    pub fn build<P: Point>(self, points: &[P]) -> (Hnsw<P>, Vec<PointId>) {
+        Hnsw::new(points, self)
     }
 }
 
