@@ -1,5 +1,5 @@
 [package]
-name = "instant-index"
+name = "instant-distance"
 version = "0.1.0"
 authors = ["Dirkjan Ochtman <dirkjan@ochtman.nl>"]
 edition = "2018"
