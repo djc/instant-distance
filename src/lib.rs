@@ -187,6 +187,14 @@ where
         }
         found
     }
+
+    /// Iterate over the keys and values in this index
+    pub fn iter(&self) -> impl Iterator<Item = (PointId, &P)> {
+        self.points
+            .iter()
+            .enumerate()
+            .map(|(i, p)| (PointId(i as u32), p))
+    }
 }
 
 /// Keeps mutable state for searching a point's nearest neighbors
