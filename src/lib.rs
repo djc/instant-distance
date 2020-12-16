@@ -168,9 +168,12 @@ where
         search.reset();
         search.push(PointId(0), point, &self.points);
         for cur in LayerId(self.layers.len()).descend() {
-            search.num = if cur.is_zero() { self.ef_search } else { 1 };
+            let (ef, num) = match cur.is_zero() {
+                true => (self.ef_search, M * 2),
+                false => (1, M),
+            };
 
-            let num = if cur.0 > 0 { M } else { M * 2 };
+            search.num = ef;
             match cur.0 {
                 0 => self.zero.search(point, search, &self.points, num),
                 l => self.layers[l - 1].search(point, search, &self.points, num),
