@@ -220,6 +220,7 @@ impl Search {
         self.visited.clear();
         self.candidates.clear();
         self.nearest.clear();
+        self.furthest = OrderedFloat::from(f32::INFINITY);
     }
 
     /// Track node `pid` as a potential new neighbor for the given `point`
