@@ -185,7 +185,7 @@ where
         }
 
         let found = min(search.nearest.len(), out.len());
-        for (i, candidate) in search.nearest.iter().take(found).enumerate() {
+        for (i, candidate) in search.nearest[..found].iter().enumerate() {
             out[i] = candidate.pid;
         }
         found
