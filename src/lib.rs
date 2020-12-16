@@ -1,4 +1,4 @@
-use std::cmp::{max, min, Ordering};
+use std::cmp::{max, min, Ordering, Reverse};
 use std::hash::Hash;
 use std::ops::Index;
 
@@ -54,7 +54,7 @@ where
         let mut nodes = (0..points.len())
             .map(|i| (LayerId::random(&mut rng), i))
             .collect::<Vec<_>>();
-        nodes.sort_unstable_by(|l, r| r.cmp(&l));
+        nodes.sort_unstable_by_key(|&n| Reverse(n));
 
         // Sort the original `points` in layer order.
         // TODO: maybe optimize this? https://crates.io/crates/permutation
