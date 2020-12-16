@@ -320,12 +320,12 @@ impl Layer for Vec<ZeroNode> {
         self.push(new);
     }
 
-    fn nodes_mut(&mut self) -> &mut [Self::Node] {
-        self
+    fn nearest_mut(&mut self, pid: PointId) -> &mut [PointId] {
+        &mut self[pid.0 as usize].nearest
     }
 
-    fn nodes(&self) -> &[Self::Node] {
-        self
+    fn nearest(&self, pid: PointId) -> &[PointId] {
+        &self[pid.0 as usize].nearest
     }
 }
 
@@ -338,12 +338,12 @@ impl Layer for Vec<UpperNode> {
         self.push(new);
     }
 
-    fn nodes_mut(&mut self) -> &mut [Self::Node] {
-        self
+    fn nearest_mut(&mut self, pid: PointId) -> &mut [PointId] {
+        &mut self[pid.0 as usize].nearest
     }
 
-    fn nodes(&self) -> &[Self::Node] {
-        self
+    fn nearest(&self, pid: PointId) -> &[PointId] {
+        &self[pid.0 as usize].nearest
     }
 }
 
@@ -371,8 +371,7 @@ trait Layer {
                 }
             }
 
-            let node = &self.nodes()[candidate.pid.0 as usize];
-            for pid in node.nearest_iter().take(num) {
+            for pid in self.nearest_iter(candidate.pid).take(num) {
                 search.push(pid, point, points);
             }
         }
@@ -405,7 +404,7 @@ trait Layer {
             new_nearest[i] = pid; // Update the new node's `nearest`
 
             let old = &points[pid];
-            let nearest = self.nodes()[pid.0 as usize].nearest();
+            let nearest = self.nearest(pid);
 
             // Find the correct index to insert at to keep the neighbor's neighbors sorted
             let idx = nearest
@@ -427,7 +426,7 @@ trait Layer {
                 continue;
             }
 
-            let nearest = self.nodes_mut()[pid.0 as usize].nearest_mut();
+            let nearest = self.nearest_mut(pid);
             if !nearest[idx].is_valid() {
                 nearest[idx] = new;
                 continue;
@@ -443,9 +442,15 @@ trait Layer {
 
     fn push(&mut self, new: Self::Node);
 
-    fn nodes_mut(&mut self) -> &mut [Self::Node];
+    fn nearest_mut(&mut self, pid: PointId) -> &mut [PointId];
 
-    fn nodes(&self) -> &[Self::Node];
+    fn nearest_iter(&self, pid: PointId) -> NearestIter<'_> {
+        NearestIter {
+            nearest: self.nearest(pid),
+        }
+    }
+
+    fn nearest(&self, pid: PointId) -> &[PointId];
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -458,18 +463,8 @@ struct UpperNode {
 }
 
 impl Node for UpperNode {
-    fn nearest(&self) -> &[PointId] {
-        &self.nearest
-    }
-
     fn nearest_mut(&mut self) -> &mut [PointId] {
         &mut self.nearest
-    }
-
-    fn nearest_iter(&self) -> NearestIter<'_> {
-        NearestIter {
-            nearest: &self.nearest,
-        }
     }
 }
 
@@ -483,25 +478,13 @@ struct ZeroNode {
 }
 
 impl Node for ZeroNode {
-    fn nearest(&self) -> &[PointId] {
-        &self.nearest
-    }
-
     fn nearest_mut(&mut self) -> &mut [PointId] {
         &mut self.nearest
-    }
-
-    fn nearest_iter(&self) -> NearestIter<'_> {
-        NearestIter {
-            nearest: &self.nearest,
-        }
     }
 }
 
 trait Node: Default {
-    fn nearest(&self) -> &[PointId];
     fn nearest_mut(&mut self) -> &mut [PointId];
-    fn nearest_iter(&self) -> NearestIter<'_>;
 }
 
 struct NearestIter<'a> {
