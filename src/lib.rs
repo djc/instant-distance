@@ -217,10 +217,18 @@ pub struct Search {
 impl Search {
     /// Resets the state to be ready for a new search
     fn reset(&mut self) {
-        self.visited.clear();
-        self.candidates.clear();
-        self.nearest.clear();
-        self.furthest = OrderedFloat::from(f32::INFINITY);
+        let Search {
+            visited,
+            candidates,
+            nearest,
+            num: _,
+            furthest,
+        } = self;
+
+        visited.clear();
+        candidates.clear();
+        nearest.clear();
+        *furthest = OrderedFloat::from(f32::INFINITY);
     }
 
     /// Track node `pid` as a potential new neighbor for the given `point`
