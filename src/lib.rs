@@ -108,7 +108,7 @@ where
         let mut pool = SearchPool::default();
         let mut batch = Vec::new();
         let mut done = Vec::new();
-        let max_batch_len = num_cpus::get();
+        let max_batch_len = num_cpus::get() * 4;
         for (layer, mut range) in ranges {
             let num = if layer.0 > 0 { M } else { M * 2 };
 
