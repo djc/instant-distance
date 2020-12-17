@@ -29,7 +29,7 @@ where
     }
 
     fn new(points: &[P], builder: Builder) -> (Self, Vec<PointId>) {
-        let ef_search = builder.ef_search.unwrap_or(100);
+        let ef_search = builder.ef_search.unwrap_or(400);
         let ef_construction = builder.ef_construction.unwrap_or(100);
         #[cfg(feature = "indicatif")]
         let progress = builder.progress;
@@ -644,7 +644,7 @@ impl Index<PointId> for [ZeroNode] {
 /// The parameter `M` from the paper
 ///
 /// This should become a generic argument to `Hnsw` when possible.
-const M: usize = 6;
+const M: usize = 12;
 
 #[cfg(test)]
 mod tests {
