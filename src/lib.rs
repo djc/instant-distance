@@ -396,6 +396,7 @@ impl Default for Search {
     }
 }
 
+/// Parameters for building the `Hnsw`
 #[derive(Default)]
 pub struct Builder {
     ef_search: Option<usize>,
@@ -405,11 +406,16 @@ pub struct Builder {
 }
 
 impl Builder {
+    /// Set the `efConstruction` parameter from the paper
     pub fn ef_construction(mut self, ef_construction: usize) -> Self {
         self.ef_construction = Some(ef_construction);
         self
     }
 
+    /// Set the `ef` parameter from the paper
+    ///
+    /// If the `efConstruction` parameter is not already set, it will be set
+    /// to the same value as `ef` by default.
     pub fn ef(mut self, ef: usize) -> Self {
         self.ef_search = Some(ef);
         if self.ef_construction.is_none() {
@@ -418,12 +424,14 @@ impl Builder {
         self
     }
 
+    /// A `ProgressBar` to track `Hnsw` construction progress
     #[cfg(feature = "indicatif")]
     pub fn progress(mut self, bar: ProgressBar) -> Self {
         self.progress = Some(bar);
         self
     }
 
+    /// Build the `Hnsw` with the given set of points
     pub fn build<P: Point>(self, points: &[P]) -> (Hnsw<P>, Vec<PointId>) {
         Hnsw::new(points, self)
     }
