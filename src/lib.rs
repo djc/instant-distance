@@ -125,7 +125,7 @@ where
                     let point = &points[*pid];
                     search.push(PointId(0), point, &points);
                     for cur in top.descend() {
-                        search.num = if cur <= layer { ef_construction } else { 1 };
+                        search.ef = if cur <= layer { ef_construction } else { 1 };
                         zero.search(point, search, &points, num);
                         match cur > layer {
                             true => search.cull(),
@@ -199,7 +199,7 @@ where
                 false => (1, M),
             };
 
-            search.num = ef;
+            search.ef = ef;
             match cur.0 {
                 0 => self.zero.search(point, search, &self.points, num),
                 l => self.layers[l - 1].search(point, search, &self.points, num),
@@ -259,7 +259,7 @@ pub struct Search {
     /// Nearest neighbors found so far (`W` in the paper)
     nearest: Vec<Candidate>,
     /// Maximum number of nearest neighbors to retain (`ef` in the paper)
-    num: usize,
+    ef: usize,
     /// Current furthest node in `nearest`
     furthest: OrderedFloat<f32>,
 }
@@ -271,7 +271,7 @@ impl Search {
             visited,
             candidates,
             nearest,
-            num: _,
+            ef: _,
             furthest,
         } = self;
 
@@ -292,13 +292,13 @@ impl Search {
 
         let other = &points[pid];
         let distance = OrderedFloat::from(point.distance(other));
-        if self.nearest.len() >= self.num && distance > self.furthest {
+        if self.nearest.len() >= self.ef && distance > self.furthest {
             return;
         }
 
-        if self.nearest.len() > self.num * 2 {
+        if self.nearest.len() > self.ef * 2 {
             self.nearest.sort_unstable();
-            self.nearest.truncate(self.num);
+            self.nearest.truncate(self.ef);
             self.furthest = self.nearest.last().unwrap().distance;
         }
 
@@ -316,7 +316,7 @@ impl Search {
     /// Invariant: `nearest` should be sorted before this is called. This is generally the case
     /// because `Layer::search()` is always called right before calling `cull()`.
     fn cull(&mut self) {
-        self.nearest.truncate(self.num); // Limit size of the set of nearest neighbors
+        self.nearest.truncate(self.ef); // Limit size of the set of nearest neighbors
         self.furthest = self.nearest.last().unwrap().distance;
         self.candidates.clear();
         self.candidates.extend(&self.nearest);
@@ -331,7 +331,7 @@ impl Default for Search {
             visited: HashSet::new(),
             candidates: Vec::new(),
             nearest: Vec::new(),
-            num: 1,
+            ef: 1,
             furthest: OrderedFloat::from(f32::INFINITY),
         }
     }
@@ -436,7 +436,7 @@ trait Layer {
         }
 
         search.nearest.sort_unstable();
-        search.nearest.truncate(search.num);
+        search.nearest.truncate(search.ef);
     }
 
     /// Insert new node in this layer
