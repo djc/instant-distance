@@ -417,12 +417,12 @@ trait Layer {
     /// element; `search.candidates` contains the enter points `ep`. `points` contains all the
     /// points, which is required to calculate distances between two points.
     ///
-    /// The `num` argument represents the number of links from each candidate to consider. This
+    /// The `links` argument represents the number of links from each candidate to consider. This
     /// function may be called for a higher layer (with M links per node) or the zero layer (with
     /// M * 2 links per node), but for performance reasons we often call this function on the data
     /// representation matching the zero layer even when we're referring to a higher layer. In that
-    /// case, we use `num` to constrain the number of per-candidate links we consider for search.
-    fn search<P: Point>(&self, point: &P, search: &mut Search, points: &[P], num: usize) {
+    /// case, we use `links` to constrain the number of per-candidate links we consider for search.
+    fn search<P: Point>(&self, point: &P, search: &mut Search, points: &[P], links: usize) {
         while let Some(candidate) = search.candidates.pop() {
             if let Some(found) = search.nearest.last() {
                 if candidate.distance > found.distance {
@@ -430,7 +430,7 @@ trait Layer {
                 }
             }
 
-            for pid in self.nearest_iter(candidate.pid).take(num) {
+            for pid in self.nearest_iter(candidate.pid).take(links) {
                 search.push(pid, point, points);
             }
         }
