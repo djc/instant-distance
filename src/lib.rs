@@ -208,6 +208,7 @@ where
             if !cur.is_zero() {
                 search.cull();
             }
+            println!("layer {:?}: nearest = {:?}", cur, search.candidates[0]);
         }
 
         let found = min(search.nearest.len(), out.len());
