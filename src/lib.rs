@@ -7,7 +7,7 @@ use ahash::AHashSet as HashSet;
 use indicatif::ProgressBar;
 use ordered_float::OrderedFloat;
 use rand::rngs::SmallRng;
-use rand::{RngCore, SeedableRng};
+use rand::{Rng, SeedableRng};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -550,7 +550,7 @@ struct LayerId(usize);
 
 impl LayerId {
     fn random(ml: f32, rng: &mut SmallRng) -> Self {
-        let layer = rng.next_u32() as f32 / u32::MAX as f32;
+        let layer = rng.gen::<f32>();
         LayerId((-(layer.ln() * ml)).floor() as usize)
     }
 
