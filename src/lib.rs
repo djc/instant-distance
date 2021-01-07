@@ -68,19 +68,39 @@ where
             .collect::<Vec<_>>();
         nodes.sort_unstable_by_key(|&n| Reverse(n));
 
+        // Find out how many layers are needed, so that we can discard empty layers in the next
+        // step. Since layer IDs are randomly generated, there might be big gaps.
+
+        let (mut num_layers, mut prev) = (1, nodes[0].0);
+        for (layer, _) in nodes.iter() {
+            if *layer != prev {
+                num_layers += 1;
+                prev = *layer;
+            }
+        }
+
         // Sort the original `points` in layer order.
         // TODO: maybe optimize this? https://crates.io/crates/permutation
 
+        let mut cur_layer = LayerId(num_layers - 1);
+        let mut prev_layer = nodes[0].0;
         let mut new_points = Vec::with_capacity(points.len());
         let mut new_nodes = Vec::with_capacity(points.len());
         let mut out = vec![PointId::invalid(); points.len()];
         for (i, &(layer, idx)) in nodes.iter().enumerate() {
+            if prev_layer != layer {
+                cur_layer = LayerId(cur_layer.0 - 1);
+                prev_layer = layer;
+            }
+
             let pid = PointId(i as u32);
             new_points.push(points[idx].clone());
-            new_nodes.push((layer, pid));
+            new_nodes.push((cur_layer, pid));
             out[idx] = pid;
         }
         let (points, nodes) = (new_points, new_nodes);
+        debug_assert_eq!(nodes.last().unwrap().0, LayerId(0));
+        debug_assert_eq!(nodes.first().unwrap().0, LayerId(num_layers - 1));
 
         // The layer from the first node is our top layer, or the zero layer if we have no nodes.
 
