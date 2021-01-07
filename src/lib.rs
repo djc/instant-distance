@@ -31,6 +31,7 @@ where
     fn new(points: &[P], builder: Builder) -> (Self, Vec<PointId>) {
         let ef_search = builder.ef_search.unwrap_or(100);
         let ef_construction = builder.ef_construction.unwrap_or(100);
+        let ml = builder.ml.unwrap_or_else(|| (M as f32).ln());
         #[cfg(feature = "indicatif")]
         let progress = builder.progress;
         #[cfg(feature = "indicatif")]
@@ -58,7 +59,7 @@ where
         assert!(points.len() < u32::MAX as usize);
         let mut rng = SmallRng::from_entropy();
         let mut nodes = (0..points.len())
-            .map(|i| (LayerId::random(&mut rng), i))
+            .map(|i| (LayerId::random(ml, &mut rng), i))
             .collect::<Vec<_>>();
         nodes.sort_unstable_by_key(|&n| Reverse(n));
 
@@ -401,6 +402,7 @@ impl Default for Search {
 pub struct Builder {
     ef_search: Option<usize>,
     ef_construction: Option<usize>,
+    ml: Option<f32>,
     #[cfg(feature = "indicatif")]
     progress: Option<ProgressBar>,
 }
@@ -421,6 +423,14 @@ impl Builder {
         if self.ef_construction.is_none() {
             self.ef_construction = Some(ef);
         }
+        self
+    }
+
+    /// Set the `mL` parameter from the paper
+    ///
+    /// If the `mL` parameter is not already set, it defaults to `ln(M)`.
+    pub fn ml(mut self, ml: f32) -> Self {
+        self.ml = Some(ml);
         self
     }
 
@@ -540,9 +550,9 @@ impl<'a> Iterator for NearestIter<'a> {
 struct LayerId(usize);
 
 impl LayerId {
-    fn random(rng: &mut SmallRng) -> Self {
+    fn random(ml: f32, rng: &mut SmallRng) -> Self {
         let layer = rng.next_u32() as f32 / u32::MAX as f32;
-        LayerId((-(layer.ln() * (M as f32).ln())).floor() as usize)
+        LayerId((-(layer.ln() * ml)).floor() as usize)
     }
 
     fn descend(&self) -> DescendingLayerIter {
