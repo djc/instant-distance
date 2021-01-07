@@ -430,8 +430,10 @@ trait Layer {
     /// case, we use `links` to constrain the number of per-candidate links we consider for search.
     fn search<P: Point>(&self, point: &P, search: &mut Search, points: &[P], links: usize) {
         while let Some(Reverse(candidate)) = search.candidates.pop() {
-            if candidate.distance > search.furthest {
-                break;
+            if let Some(furthest) = search.nearest.last() {
+                if candidate.distance > furthest.distance {
+                    break;
+                }
             }
 
             for pid in self.nearest_iter(candidate.pid).take(links) {
@@ -459,8 +461,6 @@ pub struct Search {
     nearest: Vec<Candidate>,
     /// Maximum number of nearest neighbors to retain (`ef` in the paper)
     ef: usize,
-    /// Current furthest node in `nearest`
-    furthest: OrderedFloat<f32>,
 }
 
 impl Search {
@@ -470,14 +470,12 @@ impl Search {
             visited,
             candidates,
             nearest,
-            furthest,
             ef: _,
         } = self;
 
         visited.clear();
         candidates.clear();
         nearest.clear();
-        *furthest = OrderedFloat::from(f32::INFINITY);
     }
 
     /// Track node `pid` as a potential new neighbor for the given `point`
@@ -491,20 +489,18 @@ impl Search {
 
         let other = &points[pid];
         let distance = OrderedFloat::from(point.distance(other));
-        if self.nearest.len() >= self.ef && distance > self.furthest {
-            return;
-        }
-
-        if self.nearest.len() > self.ef * 2 {
-            self.nearest.sort_unstable();
-            self.nearest.truncate(self.ef);
-            self.furthest = self.nearest.last().unwrap().distance;
-        }
-
         let new = Candidate { distance, pid };
+        let idx = match self.nearest.binary_search(&new) {
+            Err(idx) if idx < self.ef => idx,
+            Err(_) => return,
+            Ok(_) => unreachable!(),
+        };
+
+        self.nearest.insert(idx, new);
         self.candidates.push(Reverse(new));
-        self.nearest.push(new);
-        self.furthest = max(self.furthest, distance);
+        if self.nearest.len() > self.ef {
+            self.nearest.truncate(self.ef);
+        }
     }
 
     /// Lower the search to the next lower level
@@ -516,7 +512,6 @@ impl Search {
     /// because `Layer::search()` is always called right before calling `cull()`.
     fn cull(&mut self) {
         self.nearest.truncate(self.ef); // Limit size of the set of nearest neighbors
-        self.furthest = self.nearest.last().unwrap().distance;
 
         self.candidates.clear();
         for &candidate in self.nearest.iter() {
@@ -535,7 +530,6 @@ impl Default for Search {
             candidates: BinaryHeap::new(),
             nearest: Vec::new(),
             ef: 1,
-            furthest: OrderedFloat::from(f32::INFINITY),
         }
     }
 }
