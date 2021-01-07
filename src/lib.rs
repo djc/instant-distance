@@ -32,6 +32,11 @@ where
         let ef_search = builder.ef_search.unwrap_or(100);
         let ef_construction = builder.ef_construction.unwrap_or(100);
         let ml = builder.ml.unwrap_or_else(|| (M as f32).ln());
+        let mut rng = match builder.seed {
+            Some(seed) => SmallRng::seed_from_u64(seed),
+            None => SmallRng::from_entropy(),
+        };
+
         #[cfg(feature = "indicatif")]
         let progress = builder.progress;
         #[cfg(feature = "indicatif")]
@@ -57,7 +62,6 @@ where
         // progresses, while preserving randomness in each point's layer and insertion order.
 
         assert!(points.len() < u32::MAX as usize);
-        let mut rng = SmallRng::from_entropy();
         let mut nodes = (0..points.len())
             .map(|i| (LayerId::random(ml, &mut rng), i))
             .collect::<Vec<_>>();
@@ -402,6 +406,7 @@ pub struct Builder {
     ef_search: Option<usize>,
     ef_construction: Option<usize>,
     ml: Option<f32>,
+    seed: Option<u64>,
     #[cfg(feature = "indicatif")]
     progress: Option<ProgressBar>,
 }
@@ -430,6 +435,14 @@ impl Builder {
     /// If the `mL` parameter is not already set, it defaults to `ln(M)`.
     pub fn ml(mut self, ml: f32) -> Self {
         self.ml = Some(ml);
+        self
+    }
+
+    /// Set the seed value for the random number generator used to generate a layer for each point
+    ///
+    /// If this value is left unset, a seed is generated from entropy (via `getrandom()`).
+    pub fn seed(mut self, seed: u64) -> Self {
+        self.seed = Some(seed);
         self
     }
 
