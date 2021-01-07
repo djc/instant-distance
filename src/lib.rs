@@ -132,10 +132,15 @@ where
                     search.push(PointId(0), point, &points);
                     for cur in top.descend() {
                         search.ef = if cur <= layer { ef_construction } else { 1 };
-                        zero.search(point, search, &points, num);
                         match cur > layer {
-                            true => search.cull(),
-                            false => break,
+                            true => {
+                                layers[cur.0 - 1].search(point, search, &points, num);
+                                search.cull();
+                            }
+                            false => {
+                                zero.search(point, search, &points, num);
+                                break;
+                            }
                         }
                     }
                 });
