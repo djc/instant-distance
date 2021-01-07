@@ -117,6 +117,10 @@ where
         let max_batch_len = num_cpus::get() * 4;
         for (layer, mut range) in ranges {
             let num = if layer.0 > 0 { M } else { M * 2 };
+            #[cfg(feature = "indicatif")]
+            if let Some(bar) = &progress {
+                bar.set_message(&format!("Building index (layer {})", layer.0));
+            }
 
             while range.start < range.end {
                 let len = min(range.len(), max_batch_len);
