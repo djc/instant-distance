@@ -145,6 +145,9 @@ where
                     for added in done.iter().copied() {
                         search.push(added, &points[pid], &points);
                     }
+                    // Because we've added new points, we need to sort the nearest neighbors
+                    search.nearest.sort_unstable();
+
                     insert(&mut zero, pid, &search.nearest, &points);
                     done.push(pid);
                     pool.push(search);
