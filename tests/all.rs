@@ -62,7 +62,7 @@ fn randomized() {
 
     let recall = forced.intersection(&found).count();
     println!("{} matched", recall);
-    assert!(recall > 95);
+    assert!(recall > 90);
 }
 
 #[derive(Clone, Copy, Debug)]
