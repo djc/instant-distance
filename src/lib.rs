@@ -276,13 +276,11 @@ fn insert<P: Point>(layer: &mut Vec<ZeroNode>, new: PointId, found: &[Candidate]
         }
 
         let nearest = &mut layer[pid.0 as usize].nearest;
-        if !nearest[idx].is_valid() {
-            nearest[idx] = new;
-            continue;
+        if nearest[idx].is_valid() {
+            let end = (M * 2) - 1;
+            nearest.copy_within(idx..end, idx + 1);
         }
 
-        let end = (M * 2) - 1;
-        nearest.copy_within(idx..end, idx + 1);
         nearest[idx] = new;
     }
 
@@ -334,8 +332,8 @@ impl Search {
             visited,
             candidates,
             nearest,
-            ef: _,
             furthest,
+            ef: _,
         } = self;
 
         visited.clear();
