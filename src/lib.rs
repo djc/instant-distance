@@ -243,7 +243,6 @@ fn insert<P: Point>(layer: &mut Vec<ZeroNode>, new: PointId, found: &[Candidate]
         found.iter().map(|c| c.pid).collect::<HashSet<_>>().len()
     );
 
-    // Only use the `Self::LINKS` nearest candidates found
     for (i, candidate) in found.iter().take(M * 2).enumerate() {
         // `candidate` here is the new node's neighbor
         let &Candidate { distance, pid } = candidate;
