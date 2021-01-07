@@ -489,10 +489,8 @@ trait Layer {
     /// case, we use `links` to constrain the number of per-candidate links we consider for search.
     fn search<P: Point>(&self, point: &P, search: &mut Search, points: &[P], links: usize) {
         while let Some(candidate) = search.candidates.pop() {
-            if let Some(found) = search.nearest.last() {
-                if candidate.distance > found.distance {
-                    break;
-                }
+            if candidate.distance > search.furthest {
+                continue;
             }
 
             for pid in self.nearest_iter(candidate.pid).take(links) {
