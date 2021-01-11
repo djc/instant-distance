@@ -1,5 +1,5 @@
 use std::cmp::{max, min, Ordering, Reverse};
-use std::collections::BinaryHeap;
+use std::collections::{BinaryHeap, VecDeque};
 use std::hash::Hash;
 use std::ops::Index;
 
@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 pub struct Builder {
     ef_search: Option<usize>,
     ef_construction: Option<usize>,
+    heuristic: Option<Heuristic>,
     ml: Option<f32>,
     seed: Option<u64>,
     #[cfg(feature = "indicatif")]
@@ -40,6 +41,11 @@ impl Builder {
         if self.ef_construction.is_none() {
             self.ef_construction = Some(ef);
         }
+        self
+    }
+
+    pub fn select_heuristic(mut self, params: Heuristic) -> Self {
+        self.heuristic = Some(params);
         self
     }
 
@@ -70,6 +76,12 @@ impl Builder {
     pub fn build<P: Point>(self, points: &[P]) -> (Hnsw<P>, Vec<PointId>) {
         Hnsw::new(points, self)
     }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct Heuristic {
+    pub extend_candidates: bool,
+    pub keep_pruned: bool,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -234,7 +246,14 @@ where
                         search.push(added, &points[pid], &points);
                     }
 
-                    insert(&mut zero, pid, search.select_simple(num), &points);
+                    let candidates = match builder.heuristic {
+                        None => search.select_simple(num),
+                        Some(heuristic) => {
+                            search.select_heuristic(&zero, num, &points[pid], &points, heuristic)
+                        }
+                    };
+
+                    insert(&mut zero, pid, candidates, &points);
                     done.push(pid);
                     pool.push(search);
                 }
@@ -480,6 +499,71 @@ impl Search {
     fn select_simple(&mut self, num: usize) -> &[Candidate] {
         self.nearest.sort_unstable();
         &self.nearest[..min(self.nearest.len(), num)]
+    }
+
+    fn select_heuristic<P: Point>(
+        &mut self,
+        layer: &Vec<ZeroNode>,
+        num: usize,
+        point: &P,
+        points: &[P],
+        params: Heuristic,
+    ) -> &[Candidate] {
+        // Get input candidates from `self.nearest` and store them in `self.candidates`.
+        // `self.candidates` will represent `W` from the paper's algorithm 4 for now.
+        self.candidates.clear();
+        self.nearest.sort_unstable();
+        for &candidate in self.nearest.iter() {
+            self.candidates.push(Reverse(candidate));
+        }
+        // Clear `self.nearest`. This now represents the result set (`R`).
+        self.nearest.clear();
+
+        let mut working = VecDeque::new();
+        if params.extend_candidates {
+            // Because we can't extend `self.candidates` while we iterate over it, we use
+            // `working` to accumulate candidates' neighbors in.
+            for Reverse(candidate) in &self.candidates {
+                for pid in layer.nearest_iter(candidate.pid).take(num) {
+                    let other = &points[pid];
+                    let distance = OrderedFloat::from(point.distance(other));
+                    working.push_back(Candidate { distance, pid });
+                }
+            }
+
+            // Once we have all the extended candidates, push them onto `self.candidates`.
+            // Because `self.candidates` is a `BinaryHeap`, it remains in sorted order.
+            // After this loop, `working` is empty again, so we can reuse it.
+            for candidate in working.drain(..) {
+                self.candidates.push(Reverse(candidate));
+            }
+        }
+
+        // Take candidates from `self.candidates` (`W`) and compare them to the re
+        while let Some(Reverse(candidate)) = self.candidates.pop() {
+            if self.nearest.len() >= num {
+                break;
+            }
+
+            match self.nearest.binary_search(&candidate) {
+                Err(0) => self.nearest.insert(0, candidate),
+                Err(_) => working.push_back(candidate),
+                Ok(_) => unreachable!(),
+            }
+        }
+
+        // `working` was filled by pushing back from `candidates`, so it must be in sorted order.
+        if params.keep_pruned {
+            while let Some(candidate) = working.pop_front() {
+                if self.nearest.len() >= num {
+                    break;
+                }
+
+                self.nearest.push(candidate);
+            }
+        }
+
+        self.select_simple(num)
     }
 
     /// Track node `pid` as a potential new neighbor for the given `point`
