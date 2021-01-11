@@ -233,10 +233,8 @@ where
                     for added in done.iter().copied() {
                         search.push(added, &points[pid], &points);
                     }
-                    // Because we've added new points, we need to sort the nearest neighbors
-                    search.nearest.sort_unstable();
 
-                    insert(&mut zero, pid, &search.nearest, &points);
+                    insert(&mut zero, pid, search.select_simple(num), &points);
                     done.push(pid);
                     pool.push(search);
                 }
@@ -476,6 +474,12 @@ impl Search {
         visited.clear();
         candidates.clear();
         nearest.clear();
+    }
+
+    /// Selection of neighbors for insertion (algorithm 3 from the paper)
+    fn select_simple(&mut self, num: usize) -> &[Candidate] {
+        self.nearest.sort_unstable();
+        &self.nearest[..min(self.nearest.len(), num)]
     }
 
     /// Track node `pid` as a potential new neighbor for the given `point`
