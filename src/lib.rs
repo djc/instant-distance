@@ -417,7 +417,7 @@ impl SearchPool {
     }
 }
 
-impl Layer for Vec<ZeroNode> {
+impl Layer for [ZeroNode] {
     fn nearest_iter(&self, pid: PointId) -> NearestIter<'_> {
         NearestIter {
             nearest: &self[pid.0 as usize].nearest,
@@ -425,7 +425,7 @@ impl Layer for Vec<ZeroNode> {
     }
 }
 
-impl Layer for Vec<UpperNode> {
+impl Layer for [UpperNode] {
     fn nearest_iter(&self, pid: PointId) -> NearestIter<'_> {
         NearestIter {
             nearest: &self[pid.0 as usize].nearest,
@@ -503,7 +503,7 @@ impl Search {
 
     fn select_heuristic<P: Point>(
         &mut self,
-        layer: &Vec<ZeroNode>,
+        layer: &[ZeroNode],
         num: usize,
         point: &P,
         points: &[P],
