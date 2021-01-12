@@ -12,6 +12,8 @@ use rand::{Rng, SeedableRng};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde")]
+use serde_big_array::big_array;
 
 /// Parameters for building the `Hnsw`
 #[derive(Default)]
@@ -622,8 +624,11 @@ struct ZeroNode {
     /// The nearest neighbors on this layer
     ///
     /// This is always kept in sorted order (near to far).
+    #[serde(with = "BigArray")]
     nearest: [PointId; M * 2],
 }
+
+big_array! { BigArray; }
 
 impl Default for ZeroNode {
     fn default() -> ZeroNode {
