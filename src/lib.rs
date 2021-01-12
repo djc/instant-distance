@@ -617,12 +617,18 @@ impl Node for UpperNode {
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 struct ZeroNode {
     /// The nearest neighbors on this layer
     ///
     /// This is always kept in sorted order (near to far).
     nearest: [PointId; M * 2],
+}
+
+impl Default for ZeroNode {
+    fn default() -> ZeroNode {
+        ZeroNode { nearest: [PointId::invalid(); M * 2] }
+    }
 }
 
 impl Node for ZeroNode {
@@ -760,4 +766,4 @@ impl Index<PointId> for [ZeroNode] {
 /// The parameter `M` from the paper
 ///
 /// This should become a generic argument to `Hnsw` when possible.
-const M: usize = 12;
+const M: usize = 24;
