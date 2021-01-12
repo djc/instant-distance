@@ -632,7 +632,9 @@ big_array! { BigArray; }
 
 impl Default for ZeroNode {
     fn default() -> ZeroNode {
-        ZeroNode { nearest: [PointId::invalid(); M * 2] }
+        ZeroNode {
+            nearest: [PointId::invalid(); M * 2],
+        }
     }
 }
 
