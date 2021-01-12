@@ -624,10 +624,11 @@ struct ZeroNode {
     /// The nearest neighbors on this layer
     ///
     /// This is always kept in sorted order (near to far).
-    #[serde(with = "BigArray")]
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
     nearest: [PointId; M * 2],
 }
 
+#[cfg(feature = "serde-big-array")]
 big_array! { BigArray; }
 
 impl Default for ZeroNode {
