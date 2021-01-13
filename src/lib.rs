@@ -248,14 +248,7 @@ where
                         search.push(added, &points[pid], &points);
                     }
 
-                    let candidates = match builder.heuristic {
-                        None => search.select_simple(num),
-                        Some(heuristic) => {
-                            search.select_heuristic(&zero, num, &points[pid], &points, heuristic)
-                        }
-                    };
-
-                    insert(&mut zero, pid, candidates, &points);
+                    insert(pid, &mut search, &mut zero, &points, &builder.heuristic);
                     done.push(pid);
                     pool.push(search);
                 }
@@ -344,13 +337,25 @@ where
 
 /// Insert new node in the zero layer
 ///
-/// `new` contains the `PointId` for the new node; `found` is a slice containing all
-/// `Candidate`s found during searching (ordered from near to far).
+/// `new` contains the `PointId` for the new node; `search` contains the result for searching
+/// potential neighbors for the new node; `layer` contains all the nodes at the current layer;
+/// `points` is a slice of all the points in the index.
 ///
 /// Creates the new node, initializing its `nearest` array and updates the nearest neighbors
 /// for the new node's neighbors if necessary before appending the new node to the layer.
-fn insert<P: Point>(layer: &mut Vec<ZeroNode>, new: PointId, found: &[Candidate], points: &[P]) {
-    let mut node = ZeroNode::default();
+fn insert<P: Point>(
+    new: PointId,
+    search: &mut Search,
+    layer: &mut Vec<ZeroNode>,
+    points: &[P],
+    heuristic: &Option<Heuristic>,
+) {
+    let found = match heuristic {
+        None => search.select_simple(M * 2),
+        Some(heuristic) => {
+            search.select_heuristic(&layer, M * 2, &points[new], &points, *heuristic)
+        }
+    };
 
     // Just make sure the candidates are all unique
     debug_assert_eq!(
@@ -358,7 +363,8 @@ fn insert<P: Point>(layer: &mut Vec<ZeroNode>, new: PointId, found: &[Candidate]
         found.iter().map(|c| c.pid).collect::<HashSet<_>>().len()
     );
 
-    for (i, candidate) in found.iter().take(M * 2).enumerate() {
+    let mut node = ZeroNode::default();
+    for (i, candidate) in found.iter().enumerate() {
         // `candidate` here is the new node's neighbor
         let &Candidate { distance, pid } = candidate;
         node.nearest[i] = pid; // Update the new node's `nearest`
