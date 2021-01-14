@@ -618,12 +618,6 @@ struct UpperNode {
     nearest: [PointId; M],
 }
 
-impl Node for UpperNode {
-    fn nearest_mut(&mut self) -> &mut [PointId] {
-        &mut self.nearest
-    }
-}
-
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Clone, Copy, Debug)]
 struct ZeroNode {
@@ -643,16 +637,6 @@ impl Default for ZeroNode {
             nearest: [PointId::invalid(); M * 2],
         }
     }
-}
-
-impl Node for ZeroNode {
-    fn nearest_mut(&mut self) -> &mut [PointId] {
-        &mut self.nearest
-    }
-}
-
-trait Node: Default {
-    fn nearest_mut(&mut self) -> &mut [PointId];
 }
 
 struct NearestIter<'a> {
