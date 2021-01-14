@@ -38,11 +38,8 @@ impl Builder {
     ///
     /// If the `efConstruction` parameter is not already set, it will be set
     /// to the same value as `ef` by default.
-    pub fn ef(mut self, ef: usize) -> Self {
+    pub fn ef_search(mut self, ef: usize) -> Self {
         self.ef_search = Some(ef);
-        if self.ef_construction.is_none() {
-            self.ef_construction = Some(ef);
-        }
         self
     }
 
