@@ -1,7 +1,7 @@
 use std::cmp::{max, min, Ordering, Reverse};
 use std::collections::BinaryHeap;
 use std::hash::Hash;
-use std::ops::Index;
+use std::ops::{Index, IndexMut};
 
 use ahash::AHashSet as HashSet;
 #[cfg(feature = "indicatif")]
@@ -392,14 +392,14 @@ fn insert<P: Point>(
 
             let found =
                 insertion.select_heuristic(&layer, M * 2, candidate_point, points, *heuristic);
-            for (slot, hop) in layer[pid.0 as usize].nearest.iter_mut().zip(found) {
+            for (slot, hop) in layer[pid].nearest.iter_mut().zip(found) {
                 *slot = hop.pid;
             }
-            layer[new.0 as usize].nearest[i] = pid;
+            layer[new].nearest[i] = pid;
         } else {
             // Find the correct index to insert at to keep the neighbor's neighbors sorted
             let old = &points[pid];
-            let nearest = &layer[pid.0 as usize].nearest;
+            let nearest = &layer[pid].nearest;
             let idx = nearest
                 .binary_search_by(|third| {
                     // `third` here is one of the neighbors of the new node's neighbor.
@@ -409,25 +409,25 @@ fn insert<P: Point>(
                         _ => return Ordering::Greater,
                     };
 
-                    distance.cmp(&old.distance(&points[third.0 as usize]).into())
+                    distance.cmp(&old.distance(&points[third]).into())
                 })
                 .unwrap_or_else(|e| e);
 
             // It might be possible for all the neighbor's current neighbors to be closer to our
             // neighbor than to the new node, in which case we skip insertion of our new node's ID.
             if idx >= nearest.len() {
-                layer[new.0 as usize].nearest[i] = pid;
+                layer[new].nearest[i] = pid;
                 continue;
             }
 
-            let nearest = &mut layer[pid.0 as usize].nearest;
+            let nearest = &mut layer[pid].nearest;
             if nearest[idx].is_valid() {
                 let end = (M * 2) - 1;
                 nearest.copy_within(idx..end, idx + 1);
             }
 
             nearest[idx] = new;
-            layer[new.0 as usize].nearest[i] = pid;
+            layer[new].nearest[i] = pid;
         }
     }
 }
@@ -807,11 +807,17 @@ impl<P: Point> Index<PointId> for [P] {
     }
 }
 
-impl Index<PointId> for [ZeroNode] {
+impl Index<PointId> for Vec<ZeroNode> {
     type Output = ZeroNode;
 
     fn index(&self, index: PointId) -> &Self::Output {
         &self[index.0 as usize]
+    }
+}
+
+impl IndexMut<PointId> for Vec<ZeroNode> {
+    fn index_mut(&mut self, index: PointId) -> &mut Self::Output {
+        &mut self[index.0 as usize]
     }
 }
 
