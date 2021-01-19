@@ -223,11 +223,14 @@ where
         let mut zero = Vec::with_capacity(points.len());
         zero.push(ZeroNode::default());
 
+        let mut insertion = Search {
+            ef: ef_construction,
+            ..Default::default()
+        };
+
         let mut pool = SearchPool::default();
         let mut batch = Vec::new();
         let mut done = Vec::new();
-        let mut insertion = Search::default();
-        insertion.ef = ef_construction;
         let max_batch_len = num_cpus::get() * 4;
         for (layer, mut range) in ranges {
             let num = if layer.0 > 0 { M } else { M * 2 };
