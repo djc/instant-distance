@@ -25,14 +25,14 @@ fn basic() {
 
 #[test]
 fn random_heuristic() {
-    let (seed, recall) = randomized(Builder::default().select_heuristic(Heuristic::default()));
+    let (seed, recall) = randomized(Builder::default());
     println!("heuristic (seed = {}) recall = {}", seed, recall);
     assert!(recall > 98, "expected at least 98, got {}", recall);
 }
 
 #[test]
 fn random_simple() {
-    let (seed, recall) = randomized(Builder::default());
+    let (seed, recall) = randomized(Builder::default().select_heuristic(None));
     println!("simple (seed = {}) recall = {}", seed, recall);
     assert!(recall > 90, "expected at least 90, got {}", recall);
 }

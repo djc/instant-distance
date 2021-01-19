@@ -16,7 +16,6 @@ use serde::{Deserialize, Serialize};
 use serde_big_array::big_array;
 
 /// Parameters for building the `Hnsw`
-#[derive(Default)]
 pub struct Builder {
     ef_search: Option<usize>,
     ef_construction: Option<usize>,
@@ -43,8 +42,8 @@ impl Builder {
         self
     }
 
-    pub fn select_heuristic(mut self, params: Heuristic) -> Self {
-        self.heuristic = Some(params);
+    pub fn select_heuristic(mut self, params: Option<Heuristic>) -> Self {
+        self.heuristic = params;
         self
     }
 
@@ -74,6 +73,20 @@ impl Builder {
     /// Build the `Hnsw` with the given set of points
     pub fn build<P: Point>(self, points: &[P]) -> (Hnsw<P>, Vec<PointId>) {
         Hnsw::new(points, self)
+    }
+}
+
+impl Default for Builder {
+    fn default() -> Self {
+        Self {
+            ef_search: None,
+            ef_construction: None,
+            heuristic: Some(Heuristic::default()),
+            ml: None,
+            seed: None,
+            #[cfg(feature = "indicatif")]
+            progress: None,
+        }
     }
 }
 
