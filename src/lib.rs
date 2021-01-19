@@ -569,17 +569,19 @@ impl Search {
         self.working.clear();
         // Get input candidates from `self.nearest` and store them in `self.working`.
         // `self.candidates` will represent `W` from the paper's algorithm 4 for now.
-        while let Some(Reverse(candidate)) = self.candidates.pop() {
+        for &candidate in &self.nearest {
             self.working.push(candidate);
-            for hop in layer.nearest_iter(candidate.pid) {
-                if !self.visited.insert(hop) {
-                    continue;
-                }
+            if params.extend_candidates {
+                for hop in layer.nearest_iter(candidate.pid) {
+                    if !self.visited.insert(hop) {
+                        continue;
+                    }
 
-                let other = &points[hop];
-                let distance = OrderedFloat::from(point.distance(other));
-                let new = Candidate { distance, pid: hop };
-                self.working.push(new);
+                    let other = &points[hop];
+                    let distance = OrderedFloat::from(point.distance(other));
+                    let new = Candidate { distance, pid: hop };
+                    self.working.push(new);
+                }
             }
         }
 
