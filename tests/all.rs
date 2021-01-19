@@ -46,7 +46,10 @@ fn randomized() {
         }
     }
 
-    let (hnsw, pids) = Hnsw::<Point>::builder().seed(seed).build(&points);
+    let (hnsw, pids) = Hnsw::<Point>::builder()
+        .seed(seed)
+        .select_heuristic(Default::default())
+        .build(&points);
     let mut search = Search::default();
     let mut results = vec![PointId::default(); 100];
     let found = hnsw.search(&query, &mut results, &mut search);
