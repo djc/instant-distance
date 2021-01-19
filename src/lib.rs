@@ -393,9 +393,16 @@ fn insert<P: Point>(
 
             let found =
                 insertion.select_heuristic(&layer, M * 2, candidate_point, points, *heuristic);
-            for (slot, hop) in layer[pid].nearest.iter_mut().zip(found) {
-                *slot = hop.pid;
+            for (i, slot) in layer[pid].nearest.iter_mut().enumerate() {
+                if let Some(&Candidate { pid, .. }) = found.get(i) {
+                    *slot = pid;
+                } else if *slot != PointId::invalid() {
+                    *slot = PointId::invalid();
+                } else {
+                    break;
+                }
             }
+
             layer[new].nearest[i] = pid;
         } else {
             // Find the correct index to insert at to keep the neighbor's neighbors sorted
