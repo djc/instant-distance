@@ -840,4 +840,4 @@ impl IndexMut<PointId> for Vec<ZeroNode> {
 /// The parameter `M` from the paper
 ///
 /// This should become a generic argument to `Hnsw` when possible.
-const M: usize = 32;
+const M: usize = 12;
