@@ -27,7 +27,7 @@ fn basic() {
 fn random_heuristic() {
     let (seed, recall) = randomized(Builder::default());
     println!("heuristic (seed = {}) recall = {}", seed, recall);
-    assert!(recall > 98, "expected at least 98, got {}", recall);
+    assert!(recall > 97, "expected at least 98, got {}", recall);
 }
 
 #[test]
