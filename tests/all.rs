@@ -4,7 +4,7 @@ use ordered_float::OrderedFloat;
 use rand::rngs::{StdRng, ThreadRng};
 use rand::{Rng, SeedableRng};
 
-use instant_distance::{Builder, Heuristic, Hnsw, Point as _, PointId, Search};
+use instant_distance::{Builder, Hnsw, Point as _, PointId, Search};
 
 #[test]
 fn basic() {
