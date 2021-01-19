@@ -5,9 +5,6 @@ license = "MIT OR Apache-2.0"
 authors = ["Dirkjan Ochtman <dirkjan@ochtman.nl>"]
 edition = "2018"
 
-[features]
-with-serde = ["serde", "serde-big-array"]
-
 [dependencies]
 ahash = "0.6.1"
 indicatif = { version = "0.15", optional = true }
