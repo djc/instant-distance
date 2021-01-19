@@ -489,13 +489,7 @@ trait Layer {
     /// M * 2 links per node), but for performance reasons we often call this function on the data
     /// representation matching the zero layer even when we're referring to a higher layer. In that
     /// case, we use `links` to constrain the number of per-candidate links we consider for search.
-    fn search<P: Point>(
-        &self,
-        point: &P,
-        search: &mut Search,
-        points: &[P],
-        links: usize,
-    ) {
+    fn search<P: Point>(&self, point: &P, search: &mut Search, points: &[P], links: usize) {
         while let Some(Reverse(candidate)) = search.candidates.pop() {
             if let Some(furthest) = search.nearest.last() {
                 if candidate.distance > furthest.distance {
