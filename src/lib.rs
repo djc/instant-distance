@@ -370,7 +370,7 @@ fn insert<P: Point>(
 ) {
     layer.push(ZeroNode::default());
     let found = match heuristic {
-        None => search.select_simple(M * 2),
+        None => search.select_simple(),
         Some(heuristic) => search.select_heuristic(&layer, M * 2, &points[new], points, *heuristic),
     };
 
@@ -380,7 +380,7 @@ fn insert<P: Point>(
         found.iter().map(|c| c.pid).collect::<HashSet<_>>().len()
     );
 
-    for (i, candidate) in found.iter().enumerate() {
+    for (i, candidate) in found.iter().take(M * 2).enumerate() {
         // `candidate` here is the new node's neighbor
         let &Candidate { distance, pid } = candidate;
         if let Some(heuristic) = heuristic {
@@ -540,9 +540,9 @@ impl Search {
     }
 
     /// Selection of neighbors for insertion (algorithm 3 from the paper)
-    fn select_simple(&mut self, num: usize) -> &[Candidate] {
+    fn select_simple(&mut self) -> &[Candidate] {
         self.nearest.sort_unstable();
-        &self.nearest[..min(self.nearest.len(), num)]
+        &self.nearest
     }
 
     fn select_heuristic<P: Point>(
@@ -603,7 +603,7 @@ impl Search {
         }
 
         self.nearest.sort_unstable();
-        &self.nearest[..min(self.nearest.len(), num)]
+        &self.nearest
     }
 
     /// Track node `pid` as a potential new neighbor for the given `point`
