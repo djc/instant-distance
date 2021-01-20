@@ -7,7 +7,7 @@ use rand::Rng;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::{Hnsw, Layer, Point, M};
+use crate::{Hnsw, Point, M};
 
 pub(crate) struct Visited {
     store: Vec<u8>,
@@ -66,7 +66,7 @@ pub(crate) struct UpperNode {
     pub(crate) nearest: [PointId; M],
 }
 
-impl Layer for [UpperNode] {
+impl Layer for &Vec<UpperNode> {
     fn nearest_iter(&self, pid: PointId) -> NearestIter<'_> {
         NearestIter {
             nearest: &self[pid.0 as usize].nearest,
@@ -91,12 +91,16 @@ impl Default for ZeroNode {
     }
 }
 
-impl Layer for [ZeroNode] {
+impl Layer for &Vec<ZeroNode> {
     fn nearest_iter(&self, pid: PointId) -> NearestIter<'_> {
         NearestIter {
             nearest: &self[pid.0 as usize].nearest,
         }
     }
+}
+
+pub(crate) trait Layer {
+    fn nearest_iter(&self, pid: PointId) -> NearestIter<'_>;
 }
 
 pub(crate) struct NearestIter<'a> {
