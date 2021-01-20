@@ -509,7 +509,6 @@ trait Layer {
             }
         }
 
-        search.nearest.sort_unstable();
         search.nearest.truncate(search.ef);
     }
 
@@ -526,6 +525,8 @@ pub struct Search {
     /// Candidates for further inspection (`C` in the paper)
     candidates: BinaryHeap<Reverse<Candidate>>,
     /// Nearest neighbors found so far (`W` in the paper)
+    ///
+    /// This must always be in sorted (nearest first) order.
     nearest: Vec<Candidate>,
     /// Working set for heuristic selection
     working: Vec<Candidate>,
@@ -562,7 +563,6 @@ impl Search {
 
     /// Selection of neighbors for insertion (algorithm 3 from the paper)
     fn select_simple(&mut self) -> &[Candidate] {
-        self.nearest.sort_unstable();
         &self.nearest
     }
 
@@ -593,7 +593,10 @@ impl Search {
             }
         }
 
-        self.working.sort_unstable();
+        if params.extend_candidates {
+            self.working.sort_unstable();
+        }
+
         self.nearest.clear();
         self.discarded.clear();
         for candidate in self.working.drain(..) {
@@ -625,7 +628,6 @@ impl Search {
             }
         }
 
-        self.nearest.sort_unstable();
         &self.nearest
     }
 
@@ -649,9 +651,6 @@ impl Search {
 
         self.nearest.insert(idx, new);
         self.candidates.push(Reverse(new));
-        if self.nearest.len() > self.ef {
-            self.nearest.truncate(self.ef);
-        }
     }
 
     /// Lower the search to the next lower level
@@ -659,11 +658,9 @@ impl Search {
     /// Re-initialize the `Search`: `nearest`, the output `W` from the last round, now becomes
     /// the set of enter points, which we use to initialize both `candidates` and `visited`.
     ///
-    /// Invariant: `nearest` should be sorted before this is called. This is generally the case
-    /// because `Layer::search()` is always called right before calling `cull()`.
+    /// Invariant: `nearest` should be sorted and truncated before this is called. This is generally
+    /// the case because `Layer::search()` is always called right before calling `cull()`.
     fn cull(&mut self) {
-        self.nearest.truncate(self.ef); // Limit size of the set of nearest neighbors
-
         self.candidates.clear();
         for &candidate in self.nearest.iter() {
             self.candidates.push(Reverse(candidate));
