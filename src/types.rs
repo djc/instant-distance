@@ -59,42 +59,44 @@ impl Visited {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct UpperNode {
-    /// The nearest neighbors on this layer
-    ///
-    /// This is always kept in sorted order (near to far).
-    pub(crate) nearest: [PointId; M],
+pub(crate) struct UpperNode([PointId; M]);
+
+impl UpperNode {
+    pub(crate) fn from_zero(node: &ZeroNode) -> Self {
+        let mut nearest = [PointId::invalid(); M];
+        nearest.copy_from_slice(&node.0[..M]);
+        Self(nearest)
+    }
 }
 
 impl Layer for &Vec<UpperNode> {
     fn nearest_iter(&self, pid: PointId) -> NearestIter<'_> {
         NearestIter {
-            nearest: &self[pid.0 as usize].nearest,
+            nearest: &self[pid.0 as usize].0,
         }
     }
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct ZeroNode {
-    /// The nearest neighbors on this layer
-    ///
-    /// This is always kept in sorted order (near to far).
-    pub(crate) nearest: [PointId; M * 2],
+pub(crate) struct ZeroNode(pub(crate) [PointId; M * 2]);
+
+impl ZeroNode {
+    pub(crate) fn set(&mut self, idx: usize, pid: PointId) {
+        self.0[idx] = pid;
+    }
 }
 
 impl Default for ZeroNode {
     fn default() -> ZeroNode {
-        ZeroNode {
-            nearest: [PointId::invalid(); M * 2],
-        }
+        ZeroNode([PointId::invalid(); M * 2])
     }
 }
 
 impl Layer for &Vec<ZeroNode> {
     fn nearest_iter(&self, pid: PointId) -> NearestIter<'_> {
         NearestIter {
-            nearest: &self[pid.0 as usize].nearest,
+            nearest: &self[pid.0 as usize].0,
         }
     }
 }

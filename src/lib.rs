@@ -301,11 +301,7 @@ where
             // with `nearest` truncated to `M` elements.
             if layer.0 > 0 {
                 let mut upper = Vec::with_capacity(zero.len());
-                upper.extend(zero.iter().map(|zero| {
-                    let mut upper = UpperNode::default();
-                    upper.nearest.copy_from_slice(&zero.nearest[..M]);
-                    upper
-                }));
+                upper.extend(zero.iter().map(UpperNode::from_zero));
                 layers[layer.0 - 1] = upper;
             }
         }
@@ -416,7 +412,7 @@ fn insert<P: Point>(
 
             let found =
                 insertion.select_heuristic(&layer, M * 2, candidate_point, points, *heuristic);
-            for (i, slot) in layer[pid].nearest.iter_mut().enumerate() {
+            for (i, slot) in layer[pid].0.iter_mut().enumerate() {
                 if let Some(&Candidate { pid, .. }) = found.get(i) {
                     *slot = pid;
                 } else if *slot != PointId::invalid() {
@@ -426,11 +422,11 @@ fn insert<P: Point>(
                 }
             }
 
-            layer[new].nearest[i] = pid;
+            layer[new].set(i, pid);
         } else {
             // Find the correct index to insert at to keep the neighbor's neighbors sorted
             let old = &points[pid];
-            let nearest = &layer[pid].nearest;
+            let nearest = &layer[pid].0;
             let idx = nearest
                 .binary_search_by(|third| {
                     // `third` here is one of the neighbors of the new node's neighbor.
@@ -447,18 +443,18 @@ fn insert<P: Point>(
             // It might be possible for all the neighbor's current neighbors to be closer to our
             // neighbor than to the new node, in which case we skip insertion of our new node's ID.
             if idx >= nearest.len() {
-                layer[new].nearest[i] = pid;
+                layer[new].set(i, pid);
                 continue;
             }
 
-            let nearest = &mut layer[pid].nearest;
+            let nearest = &mut layer[pid].0;
             if nearest[idx].is_valid() {
                 let end = (M * 2) - 1;
                 nearest.copy_within(idx..end, idx + 1);
             }
 
             nearest[idx] = new;
-            layer[new].nearest[i] = pid;
+            layer[new].set(i, pid);
         }
     }
 }
