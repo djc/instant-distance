@@ -13,3 +13,13 @@ ordered-float = "2.0"
 rand = { version = "0.8", features = ["small_rng"] }
 rayon = "1.5"
 serde = { version = "1.0.118", features = ["derive"], optional = true }
+
+[dev-dependencies]
+bencher = "0.1.5"
+
+[[bench]]
+name = "all"
+harness = false
+
+[profile.bench]
+debug = true
