@@ -412,22 +412,12 @@ fn insert<P: Point>(
 
             let found =
                 insertion.select_heuristic(&layer, M * 2, candidate_point, points, *heuristic);
-            for (i, slot) in layer[pid].0.iter_mut().enumerate() {
-                if let Some(&Candidate { pid, .. }) = found.get(i) {
-                    *slot = pid;
-                } else if *slot != PointId::invalid() {
-                    *slot = PointId::invalid();
-                } else {
-                    break;
-                }
-            }
-
+            layer[pid].rewrite(found.iter().map(|candidate| candidate.pid));
             layer[new].set(i, pid);
         } else {
             // Find the correct index to insert at to keep the neighbor's neighbors sorted
             let old = &points[pid];
-            let nearest = &layer[pid].0;
-            let idx = nearest
+            let idx = layer[pid]
                 .binary_search_by(|third| {
                     // `third` here is one of the neighbors of the new node's neighbor.
                     let third = match third {
@@ -440,20 +430,7 @@ fn insert<P: Point>(
                 })
                 .unwrap_or_else(|e| e);
 
-            // It might be possible for all the neighbor's current neighbors to be closer to our
-            // neighbor than to the new node, in which case we skip insertion of our new node's ID.
-            if idx >= nearest.len() {
-                layer[new].set(i, pid);
-                continue;
-            }
-
-            let nearest = &mut layer[pid].0;
-            if nearest[idx].is_valid() {
-                let end = (M * 2) - 1;
-                nearest.copy_within(idx..end, idx + 1);
-            }
-
-            nearest[idx] = new;
+            layer[pid].insert(idx, new);
             layer[new].set(i, pid);
         }
     }

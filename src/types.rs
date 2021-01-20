@@ -1,5 +1,5 @@
 use std::hash::Hash;
-use std::ops::{Index, IndexMut};
+use std::ops::{Deref, Index, IndexMut};
 
 use ordered_float::OrderedFloat;
 use rand::rngs::SmallRng;
@@ -82,6 +82,33 @@ impl Layer for &Vec<UpperNode> {
 pub(crate) struct ZeroNode(pub(crate) [PointId; M * 2]);
 
 impl ZeroNode {
+    pub(crate) fn rewrite(&mut self, mut iter: impl Iterator<Item = PointId>) {
+        for slot in self.0.iter_mut() {
+            if let Some(pid) = iter.next() {
+                *slot = pid;
+            } else if *slot != PointId::invalid() {
+                *slot = PointId::invalid();
+            } else {
+                break;
+            }
+        }
+    }
+
+    pub(crate) fn insert(&mut self, idx: usize, pid: PointId) {
+        // It might be possible for all the neighbor's current neighbors to be closer to our
+        // neighbor than to the new node, in which case we skip insertion of our new node's ID.
+        if idx >= self.0.len() {
+            return;
+        }
+
+        if self.0[idx].is_valid() {
+            let end = (M * 2) - 1;
+            self.0.copy_within(idx..end, idx + 1);
+        }
+
+        self.0[idx] = pid;
+    }
+
     pub(crate) fn set(&mut self, idx: usize, pid: PointId) {
         self.0[idx] = pid;
     }
@@ -90,6 +117,14 @@ impl ZeroNode {
 impl Default for ZeroNode {
     fn default() -> ZeroNode {
         ZeroNode([PointId::invalid(); M * 2])
+    }
+}
+
+impl Deref for ZeroNode {
+    type Target = [PointId];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
