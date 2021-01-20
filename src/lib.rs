@@ -260,11 +260,11 @@ where
                         search.ef = if cur <= layer { ef_construction } else { 1 };
                         match cur > layer {
                             true => {
-                                search.search(point, &layers[cur.0 - 1], &points, num);
+                                search.search(point, layers[cur.0 - 1].as_slice(), &points, num);
                                 search.cull();
                             }
                             false => {
-                                search.search(point, &zero, &points, num);
+                                search.search(point, zero.as_slice(), &points, num);
                                 break;
                             }
                         }
@@ -343,8 +343,8 @@ where
 
             search.ef = ef;
             match cur.0 {
-                0 => search.search(point, &self.zero, &self.points, num),
-                l => search.search(point, &self.layers[l - 1], &self.points, num),
+                0 => search.search(point, self.zero.as_slice(), &self.points, num),
+                l => search.search(point, self.layers[l - 1].as_slice(), &self.points, num),
             }
 
             if !cur.is_zero() {
@@ -406,7 +406,7 @@ fn insert<P: Point>(
             insertion.reset();
             let candidate_point = &points[pid];
             insertion.push(new, candidate_point, points);
-            for hop in (&*layer).nearest_iter(pid) {
+            for hop in layer.as_slice().nearest_iter(pid) {
                 insertion.push(hop, candidate_point, points);
             }
 
@@ -537,7 +537,7 @@ impl Search {
 
     fn select_heuristic<P: Point>(
         &mut self,
-        layer: &Vec<ZeroNode>,
+        layer: &[ZeroNode],
         num: usize,
         point: &P,
         points: &[P],

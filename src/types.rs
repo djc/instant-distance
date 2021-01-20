@@ -69,7 +69,7 @@ impl UpperNode {
     }
 }
 
-impl Layer for &Vec<UpperNode> {
+impl Layer for &[UpperNode] {
     fn nearest_iter(&self, pid: PointId) -> NearestIter<'_> {
         NearestIter {
             nearest: &self[pid.0 as usize].0,
@@ -128,7 +128,7 @@ impl Deref for ZeroNode {
     }
 }
 
-impl Layer for &Vec<ZeroNode> {
+impl Layer for &[ZeroNode] {
     fn nearest_iter(&self, pid: PointId) -> NearestIter<'_> {
         NearestIter {
             nearest: &self[pid.0 as usize].0,
