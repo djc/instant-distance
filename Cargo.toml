@@ -6,7 +6,6 @@ authors = ["Dirkjan Ochtman <dirkjan@ochtman.nl>"]
 edition = "2018"
 
 [dependencies]
-ahash = "0.6.1"
 indicatif = { version = "0.15", optional = true }
 num_cpus = "1.13"
 ordered-float = "2.0"

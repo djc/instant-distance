@@ -1,7 +1,7 @@
 use std::cmp::{max, min, Ordering, Reverse};
 use std::collections::BinaryHeap;
+use std::collections::HashSet;
 
-use ahash::AHashSet as HashSet;
 #[cfg(feature = "indicatif")]
 use indicatif::ProgressBar;
 use ordered_float::OrderedFloat;
@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 mod types;
 pub use types::PointId;
-use types::{Candidate, LayerId, NearestIter, UpperNode, ZeroNode};
+use types::{Candidate, LayerId, NearestIter, UpperNode, Visited, ZeroNode};
 
 /// Parameters for building the `Hnsw`
 pub struct Builder {
@@ -225,10 +225,15 @@ where
 
         let mut insertion = Search {
             ef: ef_construction,
+            visited: Visited::with_capacity(points.len()),
             ..Default::default()
         };
 
-        let mut pool = SearchPool::default();
+        let mut pool = SearchPool {
+            pool: Vec::new(),
+            len: points.len(),
+        };
+
         let mut batch = Vec::new();
         let mut done = Vec::new();
         let max_batch_len = num_cpus::get() * 4;
@@ -331,6 +336,7 @@ where
             return 0;
         }
 
+        search.visited.reserve_capacity(self.points.len());
         search.reset();
         search.push(PointId(0), point, &self.points);
         for cur in LayerId(self.layers.len()).descend() {
@@ -456,9 +462,9 @@ fn insert<P: Point>(
     }
 }
 
-#[derive(Default)]
 struct SearchPool {
     pool: Vec<Search>,
+    len: usize,
 }
 
 impl SearchPool {
@@ -468,7 +474,7 @@ impl SearchPool {
                 search.reset();
                 search
             }
-            None => Search::default(),
+            None => Search::new(self.len),
         }
     }
 
@@ -515,7 +521,7 @@ trait Layer {
 /// initialized by using `push()` to add the initial enter points.
 pub struct Search {
     /// Nodes visited so far (`v` in the paper)
-    visited: HashSet<PointId>,
+    visited: Visited,
     /// Candidates for further inspection (`C` in the paper)
     candidates: BinaryHeap<Reverse<Candidate>>,
     /// Nearest neighbors found so far (`W` in the paper)
@@ -528,6 +534,13 @@ pub struct Search {
 }
 
 impl Search {
+    fn new(capacity: usize) -> Self {
+        Self {
+            visited: Visited::with_capacity(capacity),
+            ..Default::default()
+        }
+    }
+
     /// Resets the state to be ready for a new search
     fn reset(&mut self) {
         let Search {
@@ -663,7 +676,7 @@ impl Search {
 impl Default for Search {
     fn default() -> Self {
         Self {
-            visited: HashSet::new(),
+            visited: Visited::with_capacity(0),
             candidates: BinaryHeap::new(),
             nearest: Vec::new(),
             working: Vec::new(),

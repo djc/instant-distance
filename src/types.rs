@@ -9,6 +9,54 @@ use serde::{Deserialize, Serialize};
 
 use crate::{Hnsw, Layer, Point, M};
 
+pub(crate) struct Visited {
+    store: Vec<u8>,
+    generation: u8,
+}
+
+impl Visited {
+    pub(crate) fn with_capacity(capacity: usize) -> Self {
+        Self {
+            store: vec![0; capacity],
+            generation: 1,
+        }
+    }
+
+    pub(crate) fn reserve_capacity(&mut self, capacity: usize) {
+        if self.store.len() != capacity {
+            self.store.resize(capacity, self.generation - 1);
+        }
+    }
+
+    pub(crate) fn insert(&mut self, pid: PointId) -> bool {
+        let slot = &mut self.store[pid.0 as usize];
+        if *slot != self.generation {
+            *slot = self.generation;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub(crate) fn extend(&mut self, iter: impl Iterator<Item = PointId>) {
+        for pid in iter {
+            self.insert(pid);
+        }
+    }
+
+    pub(crate) fn clear(&mut self) {
+        if self.generation < 249 {
+            self.generation += 1;
+            return;
+        }
+
+        let len = self.store.len();
+        self.store.clear();
+        self.store.resize(len, 0);
+        self.generation = 1;
+    }
+}
+
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct UpperNode {
