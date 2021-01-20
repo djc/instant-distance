@@ -356,8 +356,9 @@ where
             }
         }
 
-        let found = min(search.nearest.len(), out.len());
-        for (i, candidate) in search.nearest[..found].iter().enumerate() {
+        let nearest = search.select_simple();
+        let found = min(nearest.len(), out.len());
+        for (i, candidate) in nearest.iter().take(found).enumerate() {
             out[i] = candidate.pid;
         }
         found
