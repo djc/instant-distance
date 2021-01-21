@@ -404,14 +404,16 @@ fn insert<P: Point>(
         let &Candidate { distance, pid } = candidate;
         if let Some(heuristic) = heuristic {
             insertion.reset();
-            let candidate_point = &points[pid];
-            insertion.push(new, candidate_point, points);
-            for hop in layer.as_slice().nearest_iter(pid) {
-                insertion.push(hop, candidate_point, points);
-            }
+            let found = insertion.add_neighbor_heuristic(
+                new,
+                layer.as_slice().nearest_iter(pid),
+                layer,
+                M * 2,
+                &points[pid],
+                points,
+                *heuristic,
+            );
 
-            let found =
-                insertion.select_heuristic(&layer, M * 2, candidate_point, points, *heuristic);
             layer[pid].rewrite(found.iter().map(|candidate| candidate.pid));
             layer[new].set(i, pid);
         } else {
@@ -510,6 +512,23 @@ impl Search {
         }
 
         self.nearest.truncate(self.ef);
+    }
+
+    fn add_neighbor_heuristic<P: Point>(
+        &mut self,
+        new: PointId,
+        current: impl Iterator<Item = PointId>,
+        layer: &[ZeroNode],
+        num: usize,
+        point: &P,
+        points: &[P],
+        params: Heuristic,
+    ) -> &[Candidate] {
+        self.push(new, point, points);
+        for pid in current {
+            self.push(pid, point, points);
+        }
+        self.select_heuristic(&layer, num, point, points, params)
     }
 
     fn select_heuristic<P: Point>(
