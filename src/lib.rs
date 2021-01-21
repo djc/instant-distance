@@ -531,6 +531,9 @@ impl Search {
         self.select_heuristic(point, &layer, num, points, params)
     }
 
+    /// Heuristically sort and truncate neighbors in `self.nearest`
+    ///
+    /// Invariant: `self.nearest` must be in sorted (nearest first) order.
     fn select_heuristic<P: Point>(
         &mut self,
         point: &P,
