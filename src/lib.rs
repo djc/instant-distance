@@ -512,29 +512,6 @@ impl Search {
         self.nearest.truncate(self.ef);
     }
 
-    /// Resets the state to be ready for a new search
-    fn reset(&mut self) {
-        let Search {
-            visited,
-            candidates,
-            nearest,
-            working,
-            discarded,
-            ef: _,
-        } = self;
-
-        visited.clear();
-        candidates.clear();
-        nearest.clear();
-        working.clear();
-        discarded.clear();
-    }
-
-    /// Selection of neighbors for insertion (algorithm 3 from the paper)
-    fn select_simple(&mut self) -> &[Candidate] {
-        &self.nearest
-    }
-
     fn select_heuristic<P: Point>(
         &mut self,
         layer: &[ZeroNode],
@@ -637,6 +614,29 @@ impl Search {
 
         self.visited.clear();
         self.visited.extend(self.nearest.iter().map(|c| c.pid));
+    }
+
+    /// Resets the state to be ready for a new search
+    fn reset(&mut self) {
+        let Search {
+            visited,
+            candidates,
+            nearest,
+            working,
+            discarded,
+            ef: _,
+        } = self;
+
+        visited.clear();
+        candidates.clear();
+        nearest.clear();
+        working.clear();
+        discarded.clear();
+    }
+
+    /// Selection of neighbors for insertion (algorithm 3 from the paper)
+    fn select_simple(&self) -> &[Candidate] {
+        &self.nearest
     }
 }
 
