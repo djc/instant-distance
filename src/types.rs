@@ -1,7 +1,8 @@
 use std::hash::Hash;
-use std::ops::{Deref, Index, IndexMut};
+use std::ops::{Deref, Index};
 
 use ordered_float::OrderedFloat;
+use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard};
 use rand::rngs::SmallRng;
 use rand::Rng;
 #[cfg(feature = "serde")]
@@ -69,11 +70,11 @@ impl UpperNode {
     }
 }
 
-impl Layer for &[UpperNode] {
-    fn nearest_iter(&self, pid: PointId) -> NearestIter<'_> {
-        NearestIter {
-            nearest: &self[pid.0 as usize].0,
-        }
+impl<'a> Layer for &'a [UpperNode] {
+    type Slice = &'a [PointId];
+
+    fn nearest_iter(&self, pid: PointId) -> NearestIter<Self::Slice> {
+        NearestIter::new(&self[pid.0 as usize].0)
     }
 }
 
@@ -128,32 +129,63 @@ impl Deref for ZeroNode {
     }
 }
 
-impl Layer for &[ZeroNode] {
-    fn nearest_iter(&self, pid: PointId) -> NearestIter<'_> {
-        NearestIter {
-            nearest: &self[pid.0 as usize].0,
-        }
+impl<'a> Layer for &'a [ZeroNode] {
+    type Slice = &'a [PointId];
+
+    fn nearest_iter(&self, pid: PointId) -> NearestIter<Self::Slice> {
+        NearestIter::new(&self[pid.0 as usize])
+    }
+}
+
+impl<'a> Layer for &'a [RwLock<ZeroNode>] {
+    type Slice = MappedRwLockReadGuard<'a, [PointId]>;
+
+    fn nearest_iter(&self, pid: PointId) -> NearestIter<Self::Slice> {
+        NearestIter::new(RwLockReadGuard::map(
+            self[pid.0 as usize].read(),
+            Deref::deref,
+        ))
     }
 }
 
 pub(crate) trait Layer {
-    fn nearest_iter(&self, pid: PointId) -> NearestIter<'_>;
+    type Slice: Deref<Target = [PointId]>;
+    fn nearest_iter(&self, pid: PointId) -> NearestIter<Self::Slice>;
 }
 
-pub(crate) struct NearestIter<'a> {
-    nearest: &'a [PointId],
+pub(crate) struct NearestIter<T> {
+    node: T,
+    cur: usize,
 }
 
-impl<'a> Iterator for NearestIter<'a> {
+impl<T> NearestIter<T>
+where
+    T: Deref<Target = [PointId]>,
+{
+    fn new(node: T) -> Self {
+        Self { node, cur: 0 }
+    }
+}
+
+impl<T> Iterator for NearestIter<T>
+where
+    T: Deref<Target = [PointId]>,
+{
     type Item = PointId;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let (&first, rest) = self.nearest.split_first()?;
-        if !first.is_valid() {
+        if self.cur >= self.node.len() {
             return None;
         }
-        self.nearest = rest;
-        Some(first)
+
+        let item = self.node[self.cur];
+        if !item.is_valid() {
+            self.cur = self.node.len();
+            return None;
+        }
+
+        self.cur += 1;
+        Some(item)
     }
 }
 
@@ -230,14 +262,6 @@ impl<P> Index<PointId> for Hnsw<P> {
     }
 }
 
-impl<P: Point> Index<PointId> for Vec<P> {
-    type Output = P;
-
-    fn index(&self, index: PointId) -> &Self::Output {
-        &self[index.0 as usize]
-    }
-}
-
 impl<P: Point> Index<PointId> for [P] {
     type Output = P;
 
@@ -246,17 +270,11 @@ impl<P: Point> Index<PointId> for [P] {
     }
 }
 
-impl Index<PointId> for Vec<ZeroNode> {
-    type Output = ZeroNode;
+impl Index<PointId> for [RwLock<ZeroNode>] {
+    type Output = RwLock<ZeroNode>;
 
     fn index(&self, index: PointId) -> &Self::Output {
         &self[index.0 as usize]
-    }
-}
-
-impl IndexMut<PointId> for Vec<ZeroNode> {
-    fn index_mut(&mut self, index: PointId) -> &mut Self::Output {
-        &mut self[index.0 as usize]
     }
 }
 
