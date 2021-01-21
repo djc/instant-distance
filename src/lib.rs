@@ -390,7 +390,7 @@ fn insert<P: Point>(
     layer.push(ZeroNode::default());
     let found = match heuristic {
         None => search.select_simple(),
-        Some(heuristic) => search.select_heuristic(&layer, M * 2, &points[new], points, *heuristic),
+        Some(heuristic) => search.select_heuristic(&points[new], &layer, M * 2, points, *heuristic),
     };
 
     // Just make sure the candidates are all unique
@@ -528,14 +528,14 @@ impl Search {
         for pid in current {
             self.push(pid, point, points);
         }
-        self.select_heuristic(&layer, num, point, points, params)
+        self.select_heuristic(point, &layer, num, points, params)
     }
 
     fn select_heuristic<P: Point>(
         &mut self,
+        point: &P,
         layer: &[ZeroNode],
         num: usize,
-        point: &P,
         points: &[P],
         params: Heuristic,
     ) -> &[Candidate] {
