@@ -403,7 +403,6 @@ fn insert<P: Point>(
         // `candidate` here is the new node's neighbor
         let &Candidate { distance, pid } = candidate;
         if let Some(heuristic) = heuristic {
-            insertion.reset();
             let found = insertion.add_neighbor_heuristic(
                 new,
                 layer.as_slice().nearest_iter(pid),
@@ -524,6 +523,7 @@ impl Search {
         points: &[P],
         params: Heuristic,
     ) -> &[Candidate] {
+        self.reset();
         self.push(new, point, points);
         for pid in current {
             self.push(pid, point, points);
