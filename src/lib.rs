@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 mod types;
 pub use types::PointId;
-use types::{Candidate, Layer, LayerId, UpperNode, Visited, ZeroNode};
+use types::{Candidate, Layer, LayerId, UpperNode, Visited, ZeroNode, INVALID};
 
 /// Parameters for building the `Hnsw`
 pub struct Builder {
@@ -178,7 +178,7 @@ where
         let mut prev_layer = nodes[0].0;
         let mut new_points = Vec::with_capacity(points.len());
         let mut new_nodes = Vec::with_capacity(points.len());
-        let mut out = vec![PointId::invalid(); points.len()];
+        let mut out = vec![INVALID; points.len()];
         for (i, &(layer, idx)) in nodes.iter().enumerate() {
             if prev_layer != layer {
                 cur_layer = LayerId(cur_layer.0 - 1);

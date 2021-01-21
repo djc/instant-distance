@@ -63,7 +63,7 @@ pub(crate) struct UpperNode([PointId; M]);
 
 impl UpperNode {
     pub(crate) fn from_zero(node: &ZeroNode) -> Self {
-        let mut nearest = [PointId::invalid(); M];
+        let mut nearest = [INVALID; M];
         nearest.copy_from_slice(&node.0[..M]);
         Self(nearest)
     }
@@ -86,8 +86,8 @@ impl ZeroNode {
         for slot in self.0.iter_mut() {
             if let Some(pid) = iter.next() {
                 *slot = pid;
-            } else if *slot != PointId::invalid() {
-                *slot = PointId::invalid();
+            } else if *slot != INVALID {
+                *slot = INVALID;
             } else {
                 break;
             }
@@ -116,7 +116,7 @@ impl ZeroNode {
 
 impl Default for ZeroNode {
     fn default() -> ZeroNode {
-        ZeroNode([PointId::invalid(); M * 2])
+        ZeroNode([INVALID; M * 2])
     }
 }
 
@@ -210,10 +210,6 @@ pub(crate) struct Candidate {
 pub struct PointId(pub(crate) u32);
 
 impl PointId {
-    pub(crate) fn invalid() -> Self {
-        PointId(u32::MAX)
-    }
-
     /// Whether this value represents a valid point
     pub fn is_valid(self) -> bool {
         self.0 != u32::MAX
@@ -222,7 +218,7 @@ impl PointId {
 
 impl Default for PointId {
     fn default() -> Self {
-        PointId::invalid()
+        INVALID
     }
 }
 
@@ -263,3 +259,5 @@ impl IndexMut<PointId> for Vec<ZeroNode> {
         &mut self[index.0 as usize]
     }
 }
+
+pub(crate) const INVALID: PointId = PointId(u32::MAX);
