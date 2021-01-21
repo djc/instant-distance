@@ -675,4 +675,4 @@ pub trait Point: Clone + Sync {
 /// The parameter `M` from the paper
 ///
 /// This should become a generic argument to `Hnsw` when possible.
-const M: usize = 12;
+const M: usize = 32;

@@ -7,6 +7,8 @@ use rand::rngs::SmallRng;
 use rand::Rng;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde-big-array")]
+use serde_big_array::big_array;
 
 use crate::{Hnsw, Point, M};
 
@@ -80,7 +82,12 @@ impl<'a> Layer for &'a [UpperNode] {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct ZeroNode(pub(crate) [PointId; M * 2]);
+pub(crate) struct ZeroNode(
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))] pub(crate) [PointId; M * 2],
+);
+
+#[cfg(feature = "serde-big-array")]
+big_array! { BigArray; }
 
 impl ZeroNode {
     pub(crate) fn rewrite(&mut self, mut iter: impl Iterator<Item = PointId>) {
