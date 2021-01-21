@@ -497,6 +497,9 @@ impl Search {
     /// M * 2 links per node), but for performance reasons we often call this function on the data
     /// representation matching the zero layer even when we're referring to a higher layer. In that
     /// case, we use `links` to constrain the number of per-candidate links we consider for search.
+    ///
+    /// Invariants: `self.nearest` should be in sorted (nearest first) order, and should be
+    /// truncated to `self.ef`.
     fn search<L: Layer, P: Point>(&mut self, point: &P, layer: L, points: &[P], links: usize) {
         while let Some(Reverse(candidate)) = self.candidates.pop() {
             if let Some(furthest) = self.nearest.last() {
@@ -508,9 +511,11 @@ impl Search {
             for pid in layer.nearest_iter(candidate.pid).take(links) {
                 self.push(pid, point, points);
             }
-        }
 
-        self.nearest.truncate(self.ef);
+            // If we don't truncate here, `furthest` will be further out than necessary, making
+            // us continue looping while we could have broken out.
+            self.nearest.truncate(self.ef);
+        }
     }
 
     fn add_neighbor_heuristic<P: Point>(
