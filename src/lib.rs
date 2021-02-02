@@ -284,7 +284,7 @@ where
             // For layers above the zero layer, make a copy of the current state of the zero layer
             // with `nearest` truncated to `M` elements.
             if layer.0 > 0 {
-                let mut upper = vec![UpperNode::default(); zero.len()];
+                let mut upper = Vec::new();
                 (&zero).into_par_iter()
                     .map(|zero| UpperNode::from_zero(&zero.read()))
                     .collect_into_vec(&mut upper);
