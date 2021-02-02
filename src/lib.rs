@@ -285,7 +285,8 @@ where
             // with `nearest` truncated to `M` elements.
             if layer.0 > 0 {
                 let mut upper = Vec::new();
-                (&zero).into_par_iter()
+                (&zero)
+                    .into_par_iter()
                     .map(|zero| UpperNode::from_zero(&zero.read()))
                     .collect_into_vec(&mut upper);
                 layers[layer.0 - 1] = upper;
