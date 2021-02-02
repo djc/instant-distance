@@ -10,7 +10,7 @@ use ordered_float::OrderedFloat;
 use parking_lot::{Mutex, RwLock};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -284,8 +284,10 @@ where
             // For layers above the zero layer, make a copy of the current state of the zero layer
             // with `nearest` truncated to `M` elements.
             if layer.0 > 0 {
-                let mut upper = Vec::with_capacity(zero.len());
-                upper.extend(zero.iter().map(|zero| UpperNode::from_zero(&zero.read())));
+                let mut upper = vec![UpperNode::default(); zero.len()];
+                (&zero).into_par_iter()
+                    .map(|zero| UpperNode::from_zero(&zero.read()))
+                    .collect_into_vec(&mut upper);
                 layers[layer.0 - 1] = upper;
             }
         }
