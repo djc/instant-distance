@@ -241,6 +241,7 @@ where
             }
 
             nodes[range].into_par_iter().for_each(|(_, pid)| {
+                let node = zero.as_slice()[*pid].write();
                 let (mut search, mut insertion) = pool.pop();
                 let point = &points.as_slice()[*pid];
                 search.reset();
@@ -263,6 +264,7 @@ where
                 insertion.ef = ef_construction;
                 insert(
                     *pid,
+                    node,
                     &mut insertion,
                     &mut search,
                     &zero,
@@ -367,13 +369,13 @@ where
 /// for the new node's neighbors if necessary before appending the new node to the layer.
 fn insert<P: Point>(
     new: PointId,
+    mut node: parking_lot::RwLockWriteGuard<ZeroNode>,
     insertion: &mut Search,
     search: &mut Search,
     layer: &[RwLock<ZeroNode>],
     points: &[P],
     heuristic: &Option<Heuristic>,
 ) {
-    let mut node = layer[new].write();
     let found = match heuristic {
         None => search.select_simple(M * 2),
         Some(heuristic) => search.select_heuristic(&points[new], layer, points, *heuristic),
