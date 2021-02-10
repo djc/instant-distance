@@ -9,7 +9,7 @@ use indicatif::ProgressBar;
 use ordered_float::OrderedFloat;
 use parking_lot::{Mutex, RwLock};
 use rand::rngs::SmallRng;
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -155,49 +155,52 @@ where
             );
         }
 
+        // Determine the number and size of layers.
+
+        let mut sizes = Vec::new();
+        let mut num = points.len();
+        loop {
+            let next = (num as f32 * ml) as usize;
+            if next < M {
+                break;
+            }
+            sizes.push((num - next, num));
+            num = next;
+        }
+        sizes.push((num, num));
+        sizes.reverse();
+
         // Give all points a random layer and sort the list of nodes by descending order for
         // construction. This allows us to copy higher layers to lower layers as construction
         // progresses, while preserving randomness in each point's layer and insertion order.
 
         assert!(points.len() < u32::MAX as usize);
-        let mut nodes = (0..points.len())
-            .map(|i| (LayerId::random(ml, &mut rng), i))
+        let mut shuffled = (0..points.len())
+            .map(|i| (PointId(rng.gen_range(0..points.len() as u32)), i))
             .collect::<Vec<_>>();
-        nodes.sort_unstable_by_key(|&n| Reverse(n));
+        shuffled.sort_unstable();
 
-        // Find out how many layers are needed, so that we can discard empty layers in the next
-        // step. Since layer IDs are randomly generated, there might be big gaps.
-
-        let (mut num_layers, mut prev) = (1, nodes[0].0);
-        for (layer, _) in nodes.iter() {
-            if *layer != prev {
-                num_layers += 1;
-                prev = *layer;
-            }
-        }
-
-        // Sort the original `points` in layer order.
-        // TODO: maybe optimize this? https://crates.io/crates/permutation
-
-        let mut cur_layer = LayerId(num_layers - 1);
-        let mut prev_layer = nodes[0].0;
         let mut new_points = Vec::with_capacity(points.len());
         let mut new_nodes = Vec::with_capacity(points.len());
         let mut out = vec![INVALID; points.len()];
-        for (i, &(layer, idx)) in nodes.iter().enumerate() {
-            if prev_layer != layer {
-                cur_layer = LayerId(cur_layer.0 - 1);
-                prev_layer = layer;
-            }
+        for (_, idx) in shuffled {
+            let pid = PointId(new_nodes.len() as u32);
+            let layer = sizes
+                .iter()
+                .enumerate()
+                .find_map(|(i, &size)| match (pid.0 as usize) < size.1 {
+                    true => Some(i),
+                    false => None,
+                })
+                .unwrap();
 
-            let pid = PointId(i as u32);
             new_points.push(points[idx].clone());
-            new_nodes.push((cur_layer, pid));
+            new_nodes.push((LayerId(sizes.len() - layer - 1), pid));
             out[idx] = pid;
         }
         let (points, nodes) = (new_points, new_nodes);
         debug_assert_eq!(nodes.last().unwrap().0, LayerId(0));
-        debug_assert_eq!(nodes.first().unwrap().0, LayerId(num_layers - 1));
+        debug_assert_eq!(nodes.first().unwrap().0, LayerId(sizes.len() - 1));
 
         // The layer from the first node is our top layer, or the zero layer if we have no nodes.
 
@@ -209,17 +212,12 @@ where
         // Figure out how many nodes will go on each layer. This helps us allocate memory capacity
         // for each layer in advance, and also helps enable batch insertion of points.
 
-        let mut sizes = vec![0; top.0 + 1];
-        for (layer, _) in nodes.iter().copied() {
-            sizes[layer.0] += 1;
-        }
-
-        let mut start = 0;
+        let num_layers = sizes.len();
         let mut ranges = Vec::with_capacity(top.0);
-        for (i, size) in sizes.into_iter().enumerate().rev() {
+        for (i, (size, cumulative)) in sizes.into_iter().enumerate() {
+            let start = cumulative - size;
             // Skip the first point, since we insert the enter point separately
-            ranges.push((LayerId(i), max(start, 1)..start + size));
-            start += size;
+            ranges.push((LayerId(num_layers - i - 1), max(start, 1)..cumulative));
         }
 
         // Insert the first point so that we have an enter point to start searches with.

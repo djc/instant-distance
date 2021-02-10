@@ -3,8 +3,6 @@ use std::ops::{Deref, Index};
 
 use ordered_float::OrderedFloat;
 use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard};
-use rand::rngs::SmallRng;
-use rand::Rng;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "serde-big-array")]
@@ -200,11 +198,6 @@ where
 pub(crate) struct LayerId(pub usize);
 
 impl LayerId {
-    pub(crate) fn random(ml: f32, rng: &mut SmallRng) -> Self {
-        let layer = rng.gen::<f32>();
-        LayerId((-layer.ln() * ml).floor() as usize)
-    }
-
     pub(crate) fn descend(&self) -> impl Iterator<Item = LayerId> {
         DescendingLayerIter { next: Some(self.0) }
     }
