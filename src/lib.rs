@@ -234,7 +234,7 @@ where
         #[cfg(feature = "indicatif")]
         let done = AtomicUsize::new(0);
         for (layer, range) in ranges {
-            let num = if layer.0 > 0 { M } else { M * 2 };
+            let num = if layer.is_zero() { M * 2 } else { M };
             #[cfg(feature = "indicatif")]
             if let Some(bar) = &progress {
                 bar.set_message(&format!("Building index (layer {})", layer.0));
@@ -285,7 +285,7 @@ where
 
             // For layers above the zero layer, make a copy of the current state of the zero layer
             // with `nearest` truncated to `M` elements.
-            if layer.0 > 0 {
+            if !layer.is_zero() {
                 let mut upper = Vec::new();
                 (&zero)
                     .into_par_iter()
