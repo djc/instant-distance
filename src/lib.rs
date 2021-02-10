@@ -52,7 +52,7 @@ impl Builder {
 
     /// Set the `mL` parameter from the paper
     ///
-    /// If the `mL` parameter is not already set, it defaults to `ln(M)`.
+    /// If the `mL` parameter is not already set, it defaults to `1.0 / ln(M)`.
     pub fn ml(mut self, ml: f32) -> Self {
         self.ml = Some(ml);
         self
@@ -127,7 +127,7 @@ where
     fn new(points: &[P], builder: Builder) -> (Self, Vec<PointId>) {
         let ef_search = builder.ef_search.unwrap_or(100);
         let ef_construction = builder.ef_construction.unwrap_or(100);
-        let ml = builder.ml.unwrap_or_else(|| (M as f32).ln());
+        let ml = builder.ml.unwrap_or_else(|| 1.0 / (M as f32).ln());
         let heuristic = builder.heuristic;
         let mut rng = match builder.seed {
             Some(seed) => SmallRng::seed_from_u64(seed),

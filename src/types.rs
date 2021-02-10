@@ -202,7 +202,7 @@ pub(crate) struct LayerId(pub usize);
 impl LayerId {
     pub(crate) fn random(ml: f32, rng: &mut SmallRng) -> Self {
         let layer = rng.gen::<f32>();
-        LayerId((-(layer.ln() * ml)).floor() as usize)
+        LayerId((-layer.ln() * ml).floor() as usize)
     }
 
     pub(crate) fn descend(&self) -> impl Iterator<Item = LayerId> {
