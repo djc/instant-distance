@@ -1,6 +1,7 @@
-use std::cmp::{max, Ordering, Reverse};
+use std::cmp::{Ordering, Reverse};
 use std::collections::BinaryHeap;
 use std::collections::HashSet;
+use std::ops::Range;
 #[cfg(feature = "indicatif")]
 use std::sync::atomic::{self, AtomicUsize};
 
@@ -10,13 +11,13 @@ use ordered_float::OrderedFloat;
 use parking_lot::{Mutex, RwLock};
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 mod types;
 pub use types::PointId;
-use types::{Candidate, Layer, LayerId, UpperNode, Visited, ZeroNode, INVALID};
+use types::{Candidate, Layer, LayerId, Meta, Visited, ZeroNode, INVALID};
 
 /// Parameters for building the `Hnsw`
 pub struct Builder {
@@ -125,8 +126,8 @@ impl Default for Heuristic {
 pub struct Hnsw<P> {
     ef_search: usize,
     points: Vec<P>,
-    zero: Vec<ZeroNode>,
-    layers: Vec<Vec<UpperNode>>,
+    meta: Meta,
+    neighbors: Vec<PointId>,
 }
 
 impl<P> Hnsw<P>
@@ -157,28 +158,15 @@ where
             return (
                 Self {
                     ef_search,
-                    zero: Vec::new(),
                     points: Vec::new(),
-                    layers: Vec::new(),
+                    neighbors: Vec::new(),
+                    meta: Meta::default(),
                 },
                 Vec::new(),
             );
         }
 
-        // Determine the number and size of layers.
-
-        let mut sizes = Vec::new();
-        let mut num = points.len();
-        loop {
-            let next = (num as f32 * ml) as usize;
-            if next < M {
-                break;
-            }
-            sizes.push((num - next, num));
-            num = next;
-        }
-        sizes.push((num, num));
-        sizes.reverse();
+        let meta = Meta::new(ml, points.len());
 
         // Give all points a random layer and sort the list of nodes by descending order for
         // construction. This allows us to copy higher layers to lower layers as construction
@@ -193,74 +181,51 @@ where
         let mut new_points = Vec::with_capacity(points.len());
         let mut new_nodes = Vec::with_capacity(points.len());
         let mut out = vec![INVALID; points.len()];
-        for (_, idx) in shuffled {
+        let mut at_layer = meta.next_lower(None).unwrap();
+        for (i, (_, idx)) in shuffled.into_iter().enumerate() {
             let pid = PointId(new_nodes.len() as u32);
-            let layer = sizes
-                .iter()
-                .enumerate()
-                .find_map(|(i, &size)| match (pid.0 as usize) < size.1 {
-                    true => Some(i),
-                    false => None,
-                })
-                .unwrap();
+            if i == at_layer.1 {
+                at_layer = meta.next_lower(Some(at_layer.0)).unwrap();
+            }
 
             new_points.push(points[idx].clone());
-            new_nodes.push((LayerId(sizes.len() - layer - 1), pid));
+            new_nodes.push((at_layer.0, pid));
             out[idx] = pid;
         }
         let (points, nodes) = (new_points, new_nodes);
+        debug_assert_eq!(nodes.first().unwrap().0, LayerId(meta.len() - 1));
         debug_assert_eq!(nodes.last().unwrap().0, LayerId(0));
-        debug_assert_eq!(nodes.first().unwrap().0, LayerId(sizes.len() - 1));
-
-        // The layer from the first node is our top layer, or the zero layer if we have no nodes.
-
-        let top = match nodes.first() {
-            Some((top, _)) => *top,
-            None => LayerId(0),
-        };
-
-        // Figure out how many nodes will go on each layer. This helps us allocate memory capacity
-        // for each layer in advance, and also helps enable batch insertion of points.
-
-        let num_layers = sizes.len();
-        let mut ranges = Vec::with_capacity(top.0);
-        for (i, (size, cumulative)) in sizes.into_iter().enumerate() {
-            let start = cumulative - size;
-            // Skip the first point, since we insert the enter point separately
-            ranges.push((LayerId(num_layers - i - 1), max(start, 1)..cumulative));
-        }
 
         // Insert the first point so that we have an enter point to start searches with.
 
-        let mut layers = vec![vec![]; top.0];
-        let zero = points
-            .iter()
-            .map(|_| RwLock::new(ZeroNode::default()))
-            .collect::<Vec<_>>();
+        let mut neighbors = vec![INVALID; meta.neighbors()];
+        let mut layers = meta.layers_mut(&mut neighbors);
+        let (zero, upper) = layers.split_first_mut().unwrap();
+        let zero = zero.zero_nodes();
 
         let pool = SearchPool::new(points.len());
         #[cfg(feature = "indicatif")]
         let done = AtomicUsize::new(0);
-        for (layer, range) in ranges {
+        for layer in meta.descending() {
             let num = if layer.is_zero() { M * 2 } else { M };
             #[cfg(feature = "indicatif")]
             if let Some(bar) = &progress {
                 bar.set_message(format!("Building index (layer {})", layer.0));
             }
 
-            let end = range.end;
-            nodes[range].into_par_iter().for_each(|(_, pid)| {
+            let Range { start, end } = meta.points(layer);
+            nodes[start..end].into_par_iter().for_each(|(_, pid)| {
                 let node = zero.as_slice()[*pid].write();
                 let (mut search, mut insertion) = pool.pop();
                 let point = &points.as_slice()[*pid];
                 search.reset();
                 search.push(PointId(0), point, &points);
 
-                for cur in top.descend() {
+                for cur in meta.descending() {
                     search.ef = if cur <= layer { ef_construction } else { 1 };
                     match cur > layer {
                         true => {
-                            search.search(point, layers[cur.0 - 1].as_slice(), &points, num);
+                            search.search(point, upper[cur.0 - 1].as_ref(), &points, num);
                             search.cull();
                         }
                         false => {
@@ -292,15 +257,10 @@ where
                 pool.push((search, insertion));
             });
 
-            // For layers above the zero layer, make a copy of the current state of the zero layer
-            // with `nearest` truncated to `M` elements.
-            if !layer.is_zero() {
-                let mut upper = Vec::new();
-                (&zero[..end])
-                    .into_par_iter()
-                    .map(|zero| UpperNode::from_zero(&zero.read()))
-                    .collect_into_vec(&mut upper);
-                layers[layer.0 - 1] = upper;
+            // Copy the current state of the zero layer
+            match layer.0 {
+                0 => break,
+                n => upper[n - 1].copy_from_zero(&zero[..end]),
             }
         }
 
@@ -312,9 +272,9 @@ where
         (
             Self {
                 ef_search,
-                zero: zero.into_iter().map(|node| node.into_inner()).collect(),
+                neighbors,
+                meta,
                 points,
-                layers,
             },
             out,
         )
@@ -337,17 +297,15 @@ where
 
         search.visited.reserve_capacity(self.points.len());
         search.push(PointId(0), point, &self.points);
-        for cur in LayerId(self.layers.len()).descend() {
+        for cur in self.meta.descending() {
             let (ef, num) = match cur.is_zero() {
                 true => (self.ef_search, M * 2),
                 false => (1, M),
             };
 
             search.ef = ef;
-            match cur.0 {
-                0 => search.search(point, self.zero.as_slice(), &self.points, num),
-                l => search.search(point, self.layers[l - 1].as_slice(), &self.points, num),
-            }
+            let layer = self.meta.layer(cur, &self.neighbors);
+            search.search(point, layer, &self.points, num);
 
             if !cur.is_zero() {
                 search.cull();
@@ -376,12 +334,12 @@ where
 ///
 /// Creates the new node, initializing its `nearest` array and updates the nearest neighbors
 /// for the new node's neighbors if necessary before appending the new node to the layer.
-fn insert<P: Point>(
+fn insert<'a, P: Point>(
     new: PointId,
-    mut node: parking_lot::RwLockWriteGuard<ZeroNode>,
+    mut node: parking_lot::RwLockWriteGuard<ZeroNode<'a>>,
     insertion: &mut Search,
     search: &mut Search,
-    layer: &[RwLock<ZeroNode>],
+    layer: &'a [RwLock<ZeroNode<'a>>],
     points: &[P],
     heuristic: &Option<Heuristic>,
 ) {

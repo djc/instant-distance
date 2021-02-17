@@ -1,14 +1,156 @@
+use std::cmp::max;
 use std::hash::Hash;
-use std::ops::{Deref, Index};
+use std::ops::{Deref, Index, Range};
 
 use ordered_float::OrderedFloat;
 use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard};
+use rayon::iter::{IndexedParallelIterator, ParallelIterator};
+use rayon::slice::ParallelSliceMut;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "serde-big-array")]
-use serde_big_array::big_array;
 
 use crate::{Hnsw, Point, M};
+
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[derive(Debug, Default)]
+pub(crate) struct Meta(pub(crate) Vec<LayerMeta>);
+
+impl Meta {
+    pub(crate) fn new(ml: f32, mut num: usize) -> Self {
+        let mut inner = Vec::new();
+        let mut neighbors = 0;
+        loop {
+            let mut next = (num as f32 * ml) as usize;
+            if next < M {
+                next = 0;
+            }
+
+            let start = neighbors;
+            neighbors += num * M * if inner.len() == 0 { 2 } else { 1 };
+            inner.push(LayerMeta {
+                max: num - next,
+                total: num,
+                start,
+                end: neighbors,
+            });
+
+            if next == 0 {
+                break;
+            }
+            num = next;
+        }
+
+        Self(inner)
+    }
+
+    pub(crate) fn next_lower(&self, cur: Option<LayerId>) -> Option<(LayerId, usize)> {
+        let idx = cur.map(|l| l.0 - 1).unwrap_or(self.len() - 1);
+        self.0.get(idx).map(|meta| (LayerId(idx), meta.total))
+    }
+
+    pub(crate) fn layer<'a>(&self, layer: LayerId, neighbors: &'a [PointId]) -> LayerSlice<'a> {
+        let meta = &self.0[layer.0];
+        LayerSlice {
+            neighbors: &neighbors[meta.start..meta.end],
+            stride: if layer.is_zero() { M * 2 } else { M },
+        }
+    }
+
+    pub(crate) fn layers_mut<'a>(
+        &self,
+        mut neighbors: &'a mut [PointId],
+    ) -> Vec<LayerSliceMut<'a>> {
+        let mut layers = Vec::with_capacity(self.0.len());
+        let mut pos = 0;
+        for meta in self.0.iter() {
+            let len = meta.end - meta.start;
+            let stride = if pos == 0 { M * 2 } else { M };
+            let (cur, rest) = neighbors.split_at_mut(len);
+            layers.push(LayerSliceMut {
+                neighbors: cur,
+                stride,
+            });
+
+            neighbors = rest;
+            pos += len;
+        }
+
+        layers
+    }
+
+    pub(crate) fn descending<'a>(&'a self) -> impl Iterator<Item = LayerId> + 'a {
+        (0..self.0.len()).into_iter().rev().map(LayerId)
+    }
+
+    pub(crate) fn points(&self, layer: LayerId) -> Range<usize> {
+        let meta = &self.0[layer.0];
+        max(meta.total - meta.max, 1)..meta.total
+    }
+
+    pub(crate) fn neighbors(&self) -> usize {
+        self.0.last().unwrap().end
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[derive(Debug)]
+pub(crate) struct LayerMeta {
+    max: usize,
+    total: usize,
+    start: usize,
+    end: usize,
+}
+
+pub(crate) struct LayerSliceMut<'a> {
+    neighbors: &'a mut [PointId],
+    stride: usize,
+}
+
+impl<'a> LayerSliceMut<'a> {
+    pub(crate) fn copy_from_zero(&mut self, zero: &[RwLock<ZeroNode<'_>>]) {
+        let stride = self.stride;
+        self.neighbors
+            .par_chunks_mut(stride)
+            .zip(zero)
+            .for_each(|(dst, src)| {
+                dst.copy_from_slice(&src.read()[..stride]);
+            });
+    }
+
+    pub(crate) fn zero_nodes(&mut self) -> Vec<RwLock<ZeroNode<'_>>> {
+        self.neighbors
+            .chunks_exact_mut(self.stride)
+            .map(|n| RwLock::new(ZeroNode(n)))
+            .collect::<Vec<_>>()
+    }
+
+    pub(crate) fn as_ref(&self) -> LayerSlice<'_> {
+        LayerSlice {
+            neighbors: self.neighbors.as_ref(),
+            stride: self.stride,
+        }
+    }
+}
+
+pub(crate) struct LayerSlice<'a> {
+    neighbors: &'a [PointId],
+    stride: usize,
+}
+
+impl<'a> Layer for LayerSlice<'a> {
+    type Slice = &'a [PointId];
+
+    fn nearest_iter(&self, pid: PointId) -> NearestIter<Self::Slice> {
+        let start = pid.0 as usize * self.stride;
+        let end = start + self.stride;
+        assert!(self.neighbors.len() >= end);
+        NearestIter::new(&self.neighbors[start..end])
+    }
+}
 
 pub(crate) struct Visited {
     store: Vec<u8>,
@@ -58,36 +200,10 @@ impl Visited {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct UpperNode([PointId; M]);
+#[derive(Debug)]
+pub(crate) struct ZeroNode<'a>(pub(crate) &'a mut [PointId]);
 
-impl UpperNode {
-    pub(crate) fn from_zero(node: &ZeroNode) -> Self {
-        let mut nearest = [INVALID; M];
-        nearest.copy_from_slice(&node.0[..M]);
-        Self(nearest)
-    }
-}
-
-impl<'a> Layer for &'a [UpperNode] {
-    type Slice = &'a [PointId];
-
-    fn nearest_iter(&self, pid: PointId) -> NearestIter<Self::Slice> {
-        NearestIter::new(&self[pid.0 as usize].0)
-    }
-}
-
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct ZeroNode(
-    #[cfg_attr(feature = "serde", serde(with = "BigArray"))] pub(crate) [PointId; M * 2],
-);
-
-#[cfg(feature = "serde-big-array")]
-big_array! { BigArray; }
-
-impl ZeroNode {
+impl<'a> ZeroNode<'a> {
     pub(crate) fn rewrite(&mut self, mut iter: impl Iterator<Item = PointId>) {
         for slot in self.0.iter_mut() {
             if let Some(pid) = iter.next() {
@@ -120,13 +236,7 @@ impl ZeroNode {
     }
 }
 
-impl Default for ZeroNode {
-    fn default() -> ZeroNode {
-        ZeroNode([INVALID; M * 2])
-    }
-}
-
-impl Deref for ZeroNode {
+impl<'a> Deref for ZeroNode<'a> {
     type Target = [PointId];
 
     fn deref(&self) -> &Self::Target {
@@ -134,15 +244,7 @@ impl Deref for ZeroNode {
     }
 }
 
-impl<'a> Layer for &'a [ZeroNode] {
-    type Slice = &'a [PointId];
-
-    fn nearest_iter(&self, pid: PointId) -> NearestIter<Self::Slice> {
-        NearestIter::new(&self[pid.0 as usize])
-    }
-}
-
-impl<'a> Layer for &'a [RwLock<ZeroNode>] {
+impl<'a> Layer for &'a [RwLock<ZeroNode<'a>>] {
     type Slice = MappedRwLockReadGuard<'a, [PointId]>;
 
     fn nearest_iter(&self, pid: PointId) -> NearestIter<Self::Slice> {
@@ -198,37 +300,11 @@ where
 pub(crate) struct LayerId(pub usize);
 
 impl LayerId {
-    pub(crate) fn descend(&self) -> impl Iterator<Item = LayerId> {
-        DescendingLayerIter { next: Some(self.0) }
-    }
-
     pub(crate) fn is_zero(&self) -> bool {
         self.0 == 0
     }
 }
 
-struct DescendingLayerIter {
-    next: Option<usize>,
-}
-
-impl Iterator for DescendingLayerIter {
-    type Item = LayerId;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        Some(LayerId(match self.next? {
-            0 => {
-                self.next = None;
-                0
-            }
-            next => {
-                self.next = Some(next - 1);
-                next
-            }
-        }))
-    }
-}
-
-/// A potential nearest neighbor
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Candidate {
     pub(crate) distance: OrderedFloat<f32>,
@@ -284,8 +360,8 @@ impl<P: Point> Index<PointId> for [P] {
     }
 }
 
-impl Index<PointId> for [RwLock<ZeroNode>] {
-    type Output = RwLock<ZeroNode>;
+impl<'a> Index<PointId> for [RwLock<ZeroNode<'a>>] {
+    type Output = RwLock<ZeroNode<'a>>;
 
     fn index(&self, index: PointId) -> &Self::Output {
         &self[index.0 as usize]
