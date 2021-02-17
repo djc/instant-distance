@@ -238,6 +238,7 @@ where
                 bar.set_message(&format!("Building index (layer {})", layer.0));
             }
 
+            let end = range.end;
             nodes[range].into_par_iter().for_each(|(_, pid)| {
                 let node = zero.as_slice()[*pid].write();
                 let (mut search, mut insertion) = pool.pop();
@@ -285,7 +286,7 @@ where
             // with `nearest` truncated to `M` elements.
             if !layer.is_zero() {
                 let mut upper = Vec::new();
-                (&zero)
+                (&zero[..end])
                     .into_par_iter()
                     .map(|zero| UpperNode::from_zero(&zero.read()))
                     .collect_into_vec(&mut upper);
