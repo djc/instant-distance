@@ -340,7 +340,7 @@ where
             }
         }
 
-        let nearest = search.select_simple(out.len());
+        let nearest = &search.select_simple()[..out.len()];
         for (i, candidate) in nearest.iter().enumerate() {
             out[i] = candidate.pid;
         }
@@ -376,7 +376,7 @@ fn insert<P: Point>(
     heuristic: &Option<Heuristic>,
 ) {
     let found = match heuristic {
-        None => search.select_simple(M * 2),
+        None => &search.select_simple()[..M * 2],
         Some(heuristic) => search.select_heuristic(&points[new], layer, points, *heuristic),
     };
 
@@ -653,8 +653,7 @@ impl Search {
     }
 
     /// Selection of neighbors for insertion (algorithm 3 from the paper)
-    fn select_simple(&mut self, num: usize) -> &[Candidate] {
-        self.nearest.truncate(num);
+    fn select_simple(&mut self) -> &[Candidate] {
         &self.nearest
     }
 }
