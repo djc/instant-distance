@@ -4,7 +4,7 @@ use ordered_float::OrderedFloat;
 use rand::rngs::{StdRng, ThreadRng};
 use rand::{Rng, SeedableRng};
 
-use instant_distance::{Builder, Point as _, PointId, Search};
+use instant_distance::{Builder, Point as _, Search};
 
 #[test]
 fn random_heuristic() {
@@ -40,9 +40,8 @@ fn randomized(builder: Builder) -> (u64, usize) {
 
     let (hnsw, pids) = builder.seed(seed).build(&points);
     let mut search = Search::default();
-    let mut results = vec![PointId::default(); 100];
-    let found = hnsw.search(&query, &mut results, &mut search);
-    assert_eq!(found, 100);
+    let results = hnsw.search(&query, &mut search);
+    assert!(results.len() >= 100);
 
     nearest.sort_unstable();
     nearest.truncate(100);
@@ -50,7 +49,7 @@ fn randomized(builder: Builder) -> (u64, usize) {
         .iter()
         .map(|(_, i)| pids[*i])
         .collect::<HashSet<_>>();
-    let found = results.into_iter().take(found).collect::<HashSet<_>>();
+    let found = results.take(100).collect::<HashSet<_>>();
     (seed, forced.intersection(&found).count())
 }
 

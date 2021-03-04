@@ -315,9 +315,17 @@ where
     /// The results are returned in the `out` parameter; the number of neighbors to search for
     /// is limited by the size of the `out` parameter, and the number of results found is returned
     /// in the return value.
-    pub fn search(&self, point: &P, out: &mut [PointId], search: &mut Search) -> usize {
+    pub fn search<'a>(
+        &self,
+        point: &P,
+        search: &'a mut Search,
+    ) -> impl Iterator<Item = PointId> + ExactSizeIterator + 'a {
+        fn map(candidate: &Candidate) -> PointId {
+            candidate.pid
+        }
+
         if self.points.is_empty() {
-            return 0;
+            return (&[] as &[Candidate]).iter().map(map);
         }
 
         search.visited.reserve_capacity(self.points.len());
@@ -340,11 +348,7 @@ where
             }
         }
 
-        let nearest = &search.select_simple()[..out.len()];
-        for (i, candidate) in nearest.iter().enumerate() {
-            out[i] = candidate.pid;
-        }
-        nearest.len()
+        search.select_simple().iter().map(map)
     }
 
     /// Iterate over the keys and values in this index
@@ -376,7 +380,10 @@ fn insert<P: Point>(
     heuristic: &Option<Heuristic>,
 ) {
     let found = match heuristic {
-        None => &search.select_simple()[..M * 2],
+        None => {
+            let candidates = search.select_simple();
+            &candidates[..Ord::min(candidates.len(), M * 2)]
+        }
         Some(heuristic) => search.select_heuristic(&points[new], layer, points, *heuristic),
     };
 
