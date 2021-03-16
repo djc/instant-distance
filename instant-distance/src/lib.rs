@@ -20,11 +20,11 @@ use types::{Candidate, Layer, LayerId, UpperNode, Visited, ZeroNode, INVALID};
 
 /// Parameters for building the `Hnsw`
 pub struct Builder {
-    ef_search: Option<usize>,
-    ef_construction: Option<usize>,
+    ef_search: usize,
+    ef_construction: usize,
     heuristic: Option<Heuristic>,
-    ml: Option<f32>,
-    seed: Option<u64>,
+    ml: f32,
+    seed: u64,
     #[cfg(feature = "indicatif")]
     progress: Option<ProgressBar>,
 }
@@ -32,7 +32,7 @@ pub struct Builder {
 impl Builder {
     /// Set the `efConstruction` parameter from the paper
     pub fn ef_construction(mut self, ef_construction: usize) -> Self {
-        self.ef_construction = Some(ef_construction);
+        self.ef_construction = ef_construction;
         self
     }
 
@@ -41,7 +41,7 @@ impl Builder {
     /// If the `efConstruction` parameter is not already set, it will be set
     /// to the same value as `ef` by default.
     pub fn ef_search(mut self, ef: usize) -> Self {
-        self.ef_search = Some(ef);
+        self.ef_search = ef;
         self
     }
 
@@ -54,7 +54,7 @@ impl Builder {
     ///
     /// If the `mL` parameter is not already set, it defaults to `1.0 / ln(M)`.
     pub fn ml(mut self, ml: f32) -> Self {
-        self.ml = Some(ml);
+        self.ml = ml;
         self
     }
 
@@ -62,7 +62,7 @@ impl Builder {
     ///
     /// If this value is left unset, a seed is generated from entropy (via `getrandom()`).
     pub fn seed(mut self, seed: u64) -> Self {
-        self.seed = Some(seed);
+        self.seed = seed;
         self
     }
 
@@ -82,11 +82,11 @@ impl Builder {
 impl Default for Builder {
     fn default() -> Self {
         Self {
-            ef_search: None,
-            ef_construction: None,
+            ef_search: 100,
+            ef_construction: 100,
             heuristic: Some(Heuristic::default()),
-            ml: None,
-            seed: None,
+            ml: 1.0 / (M as f32).ln(),
+            seed: rand::random(),
             #[cfg(feature = "indicatif")]
             progress: None,
         }
@@ -125,14 +125,11 @@ where
     }
 
     fn new(points: &[P], builder: Builder) -> (Self, Vec<PointId>) {
-        let ef_search = builder.ef_search.unwrap_or(100);
-        let ef_construction = builder.ef_construction.unwrap_or(100);
-        let ml = builder.ml.unwrap_or_else(|| 1.0 / (M as f32).ln());
+        let ef_search = builder.ef_search;
+        let ef_construction = builder.ef_construction;
+        let ml = builder.ml;
         let heuristic = builder.heuristic;
-        let mut rng = match builder.seed {
-            Some(seed) => SmallRng::seed_from_u64(seed),
-            None => SmallRng::from_entropy(),
-        };
+        let mut rng = SmallRng::seed_from_u64(builder.seed);
 
         #[cfg(feature = "indicatif")]
         let progress = builder.progress;
