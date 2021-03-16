@@ -1,0 +1,16 @@
+[package]
+name = "instant-distance-py"
+version = "0.1.0"
+authors = ["Dirkjan Ochtman <dirkjan@ochtman.nl>"]
+edition = "2018"
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "instant_distance"
+crate-type = ["cdylib"]
+
+[dependencies]
+instant-distance = { version = "0.2", path = "../instant-distance" }
+pyo3 = { version = "0.13.2", features = ["extension-module"] }
+serde = { version = "1", features = ["derive"] }
+serde-big-array = "0.3.2"
