@@ -77,6 +77,19 @@ impl Builder {
     pub fn build<P: Point>(self, points: &[P]) -> (Hnsw<P>, Vec<PointId>) {
         Hnsw::new(points, self)
     }
+
+    #[doc(hidden)]
+    pub fn into_parts(self) -> (usize, usize, f32, u64) {
+        let Self {
+            ef_search,
+            ef_construction,
+            heuristic: _,
+            ml,
+            seed,
+            ..
+        } = self;
+        (ef_search, ef_construction, ml, seed)
+    }
 }
 
 impl Default for Builder {
