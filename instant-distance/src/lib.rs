@@ -673,6 +673,11 @@ impl Search {
     fn iter(&self) -> impl Iterator<Item = PointId> + ExactSizeIterator + '_ {
         self.nearest.iter().map(|candidate| candidate.pid)
     }
+
+    #[doc(hidden)]
+    pub fn get(&self, i: usize) -> Option<PointId> {
+        self.nearest.get(i).map(|candidate| candidate.pid)
+    }
 }
 
 impl Default for Search {
