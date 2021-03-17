@@ -246,6 +246,11 @@ impl PointId {
     pub fn is_valid(self) -> bool {
         self.0 != u32::MAX
     }
+
+    #[doc(hidden)]
+    pub fn into_inner(self) -> u32 {
+        self.0
+    }
 }
 
 impl Default for PointId {
