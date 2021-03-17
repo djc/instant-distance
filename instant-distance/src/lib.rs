@@ -330,16 +330,12 @@ where
         point: &P,
         search: &'a mut Search,
     ) -> impl Iterator<Item = PointId> + ExactSizeIterator + 'a {
-        fn map(candidate: &Candidate) -> PointId {
-            candidate.pid
-        }
-
+        search.reset();
         if self.points.is_empty() {
-            return (&[] as &[Candidate]).iter().map(map);
+            return search.iter();
         }
 
         search.visited.reserve_capacity(self.points.len());
-        search.reset();
         search.push(PointId(0), point, &self.points);
         for cur in LayerId(self.layers.len()).descend() {
             let (ef, num) = match cur.is_zero() {
@@ -358,7 +354,7 @@ where
             }
         }
 
-        search.select_simple().iter().map(map)
+        search.iter()
     }
 
     /// Iterate over the keys and values in this index
@@ -672,6 +668,10 @@ impl Search {
     /// Selection of neighbors for insertion (algorithm 3 from the paper)
     fn select_simple(&mut self) -> &[Candidate] {
         &self.nearest
+    }
+
+    fn iter(&self) -> impl Iterator<Item = PointId> + ExactSizeIterator + '_ {
+        self.nearest.iter().map(|candidate| candidate.pid)
     }
 }
 
