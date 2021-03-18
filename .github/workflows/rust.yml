@@ -28,10 +28,20 @@ jobs:
           profile: minimal
           toolchain: ${{ matrix.rust }}
           override: true
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+          architecture: x64
+      - if: matrix.platform.os == 'ubuntu-latest'
+        name: Prepare LD_LIBRARY_PATH (Ubuntu only)
+        run: echo LD_LIBRARY_PATH=${pythonLocation}/lib >> $GITHUB_ENV
+
       - uses: actions-rs/cargo@v1
         with:
           command: build
-          args: -p instant-distance --all-features --all-targets
+          args: --all-features --all-targets
       - uses: actions-rs/cargo@v1
         with:
           command: test
