@@ -14,3 +14,6 @@ instant-distance = { version = "0.2", path = "../instant-distance" }
 pyo3 = { version = "0.13.2", features = ["extension-module"] }
 serde = { version = "1", features = ["derive"] }
 serde-big-array = "0.3.2"
+
+[package.metadata.maturin]
+name = "instant-distance"
