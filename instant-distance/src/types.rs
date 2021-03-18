@@ -247,7 +247,7 @@ impl PointId {
         self.0 != u32::MAX
     }
 
-    #[doc(hidden)]
+    /// Return the identifier value
     pub fn into_inner(self) -> u32 {
         self.0
     }
