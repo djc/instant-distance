@@ -1,9 +1,11 @@
 #![allow(clippy::from_iter_instead_of_collect)]
 use std::convert::TryFrom;
+use std::fs::File;
+use std::io::{BufReader, BufWriter};
 use std::iter::FromIterator;
 
 use instant_distance::Point;
-use pyo3::exceptions::PyTypeError;
+use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::proc_macro::{pyclass, pymethods, pymodule, pyproto};
 use pyo3::types::{PyList, PyModule};
 use pyo3::{PyAny, PyErr, PyIterProtocol, PyObjectProtocol, PyRef, PyRefMut, PyResult, Python};
@@ -37,6 +39,22 @@ impl Hnsw {
         let (inner, ids) = instant_distance::Builder::from(config).build(&points);
         let ids = Vec::from_iter(ids.into_iter().map(PointId::from));
         Ok((Self { inner }, ids))
+    }
+
+    #[staticmethod]
+    fn load(fname: &str) -> PyResult<Self> {
+        let hnsw = bincode::deserialize_from::<_, instant_distance::Hnsw<FloatArray>>(
+            BufReader::with_capacity(32 * 1024 * 1024, File::open(fname)?),
+        )
+        .map_err(|e| PyValueError::new_err(format!("deserialization error: {:?}", e)))?;
+        Ok(Self { inner: hnsw })
+    }
+
+    fn dump(&self, fname: &str) -> PyResult<()> {
+        let f = BufWriter::with_capacity(32 * 1024 * 1024, File::create(fname)?);
+        bincode::serialize_into(f, &self.inner)
+            .map_err(|e| PyValueError::new_err(format!("serialization error: {:?}", e)))?;
+        Ok(())
     }
 
     fn search(&self, point: &PyAny, search: &mut Search) -> PyResult<()> {
