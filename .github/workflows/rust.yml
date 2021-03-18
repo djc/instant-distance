@@ -31,11 +31,11 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --workspace --all-features --all-targets
+          args: -p instant-distance --all-features --all-targets
       - uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --workspace --all-features
+          args: -p instant-distance --all-features
 
   lint:
     runs-on: ubuntu-latest
