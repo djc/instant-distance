@@ -21,6 +21,10 @@ fn instant_distance(_: Python, m: &PyModule) -> PyResult<()> {
     Ok(())
 }
 
+/// An instance of hierarchical navigable small worlds
+///
+/// For now, this is specialized to only support 300-element (32-bit) float vectors
+/// with a squared Euclidean distance metric.
 #[pyclass]
 struct Hnsw {
     inner: instant_distance::Hnsw<FloatArray>,
@@ -28,6 +32,7 @@ struct Hnsw {
 
 #[pymethods]
 impl Hnsw {
+    /// Build the index
     #[staticmethod]
     fn build(input: &PyList, config: &Config) -> PyResult<(Self, Vec<u32>)> {
         let points = input
@@ -40,6 +45,7 @@ impl Hnsw {
         Ok((Self { inner }, ids))
     }
 
+    /// Load an index from the given file name
     #[staticmethod]
     fn load(fname: &str) -> PyResult<Self> {
         let hnsw = bincode::deserialize_from::<_, instant_distance::Hnsw<FloatArray>>(
@@ -49,6 +55,7 @@ impl Hnsw {
         Ok(Self { inner: hnsw })
     }
 
+    /// Dump the index to the given file name
     fn dump(&self, fname: &str) -> PyResult<()> {
         let f = BufWriter::with_capacity(32 * 1024 * 1024, File::create(fname)?);
         bincode::serialize_into(f, &self.inner)
@@ -56,6 +63,13 @@ impl Hnsw {
         Ok(())
     }
 
+    /// Search the index for points neighboring the given point
+    ///
+    /// The `search` object contains buffers used for searching. When the search completes,
+    /// iterate over the `Search` to get the results. The number of results should be equal
+    /// to the `ef_search` parameter set in the index's `config`.
+    ///
+    /// For best performance, reusing `Search` objects is recommended.
     fn search(&self, point: &PyAny, search: &mut Search) -> PyResult<()> {
         let point = FloatArray::try_from(point)?;
         let _ = self.inner.search(&point, &mut search.inner);
@@ -64,6 +78,7 @@ impl Hnsw {
     }
 }
 
+/// Search buffer and result set
 #[pyclass]
 struct Search {
     inner: instant_distance::Search,
@@ -72,6 +87,7 @@ struct Search {
 
 #[pymethods]
 impl Search {
+    /// Initialize an empty search buffer
     #[new]
     fn new() -> Self {
         Self {
@@ -87,6 +103,7 @@ impl PyIterProtocol for Search {
         slf
     }
 
+    /// Return the next closest point
     fn __next__(mut slf: PyRefMut<Self>) -> Option<u32> {
         let idx = match &slf.cur {
             Some(idx) => *idx,
@@ -109,14 +126,24 @@ impl PyIterProtocol for Search {
 #[pyclass]
 #[derive(Copy, Clone, Default)]
 struct Config {
+    /// Number of nearest neighbors to cache during the search
     #[pyo3(get, set)]
     ef_search: usize,
+    /// Number of nearest neighbors to cache during construction
     #[pyo3(get, set)]
     ef_construction: usize,
+    /// Parameter to control the number of layers
     #[pyo3(get, set)]
     ml: f32,
+    /// Random seed used to randomize the order of points
+    ///
+    /// This can be useful if you want to have fully deterministic results.
     #[pyo3(get, set)]
     seed: u64,
+    /// Whether to use the heuristic search algorithm
+    ///
+    /// This will prioritize neighbors that are farther away from other, closer neighbors,
+    /// in order to get better results on clustered data points.
     #[pyo3(get, set)]
     heuristic: Option<Heuristic>,
 }
@@ -159,8 +186,12 @@ impl From<&Config> for instant_distance::Builder {
 #[pyclass]
 #[derive(Copy, Clone)]
 struct Heuristic {
+    /// Whether to extend the candidate set before selecting results
+    ///
+    /// This is only useful only for extremely clustered data.
     #[pyo3(get, set)]
     extend_candidates: bool,
+    /// Whether to keep pruned neighbors to make the neighbor set size constant
     #[pyo3(get, set)]
     keep_pruned: bool,
 }
