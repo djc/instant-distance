@@ -329,7 +329,7 @@ where
         &self,
         point: &P,
         search: &'a mut Search,
-    ) -> impl Iterator<Item = PointId> + ExactSizeIterator + 'a {
+    ) -> impl Iterator<Item = Candidate> + ExactSizeIterator + 'a {
         search.reset();
         if self.points.is_empty() {
             return search.iter();
@@ -670,13 +670,13 @@ impl Search {
         &self.nearest
     }
 
-    fn iter(&self) -> impl Iterator<Item = PointId> + ExactSizeIterator + '_ {
-        self.nearest.iter().map(|candidate| candidate.pid)
+    fn iter(&self) -> impl Iterator<Item = Candidate> + ExactSizeIterator + '_ {
+        self.nearest.iter().copied()
     }
 
     #[doc(hidden)]
-    pub fn get(&self, i: usize) -> Option<PointId> {
-        self.nearest.get(i).map(|candidate| candidate.pid)
+    pub fn get(&self, i: usize) -> Option<Candidate> {
+        self.nearest.get(i).copied()
     }
 }
 

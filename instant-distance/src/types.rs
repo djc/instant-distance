@@ -228,10 +228,19 @@ impl Iterator for DescendingLayerIter {
     }
 }
 
+/// A potential nearest neighbor
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub(crate) struct Candidate {
+pub struct Candidate {
     pub(crate) distance: OrderedFloat<f32>,
-    pub(crate) pid: PointId,
+    /// The identifier for the neighboring point
+    pub pid: PointId,
+}
+
+impl Candidate {
+    /// Distance to the neighboring point
+    pub fn distance(&self) -> f32 {
+        *self.distance
+    }
 }
 
 /// References a `Point` in the `Hnsw`

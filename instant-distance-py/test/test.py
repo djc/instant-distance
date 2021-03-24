@@ -7,8 +7,8 @@ def main():
     p = [random.random() for _ in range(300)]
     search = instant_distance.Search()
     hnsw.search(p, search)
-    for pid in search:
-        print(pid)
+    for candidate in search:
+        print(candidate)
 
 if __name__ == '__main__':
     main()

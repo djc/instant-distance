@@ -8,12 +8,13 @@ use instant_distance::Point;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::proc_macro::{pyclass, pymethods, pymodule, pyproto};
 use pyo3::types::{PyList, PyModule};
-use pyo3::{PyAny, PyErr, PyIterProtocol, PyRef, PyRefMut, PyResult, Python};
+use pyo3::{PyAny, PyErr, PyIterProtocol, PyObjectProtocol, PyRef, PyRefMut, PyResult, Python};
 use serde::{Deserialize, Serialize};
 use serde_big_array::big_array;
 
 #[pymodule]
 fn instant_distance(_: Python, m: &PyModule) -> PyResult<()> {
+    m.add_class::<Candidate>()?;
     m.add_class::<Heuristic>()?;
     m.add_class::<Config>()?;
     m.add_class::<Search>()?;
@@ -104,14 +105,14 @@ impl PyIterProtocol for Search {
     }
 
     /// Return the next closest point
-    fn __next__(mut slf: PyRefMut<Self>) -> Option<u32> {
+    fn __next__(mut slf: PyRefMut<Self>) -> Option<Candidate> {
         let idx = match &slf.cur {
             Some(idx) => *idx,
             None => return None,
         };
 
-        let pid = match slf.inner.get(idx) {
-            Some(pid) => pid,
+        let candidate = match slf.inner.get(idx) {
+            Some(c) => c,
             None => {
                 slf.cur = None;
                 return None;
@@ -119,7 +120,10 @@ impl PyIterProtocol for Search {
         };
 
         slf.cur = Some(idx + 1);
-        Some(pid.into_inner())
+        Some(Candidate {
+            pid: candidate.pid.into_inner(),
+            distance: candidate.distance(),
+        })
     }
 }
 
@@ -231,6 +235,24 @@ impl From<Heuristic> for instant_distance::Heuristic {
             extend_candidates,
             keep_pruned,
         }
+    }
+}
+
+/// Search buffer and result set
+#[pyclass]
+struct Candidate {
+    /// Identifier for the neighboring point
+    #[pyo3(get)]
+    pid: u32,
+    /// Distance to the neighboring point
+    #[pyo3(get)]
+    distance: f32,
+}
+
+#[pyproto]
+impl PyObjectProtocol for Candidate {
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("instant_distance.Candidate(pid={}, distance={})", self.pid, self.distance))
     }
 }
 
