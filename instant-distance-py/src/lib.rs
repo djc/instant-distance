@@ -252,7 +252,10 @@ struct Candidate {
 #[pyproto]
 impl PyObjectProtocol for Candidate {
     fn __repr__(&self) -> PyResult<String> {
-        Ok(format!("instant_distance.Candidate(pid={}, distance={})", self.pid, self.distance))
+        Ok(format!(
+            "instant_distance.Candidate(pid={}, distance={})",
+            self.pid, self.distance
+        ))
     }
 }
 
