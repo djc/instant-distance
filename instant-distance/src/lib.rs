@@ -245,7 +245,7 @@ where
             let num = if layer.is_zero() { M * 2 } else { M };
             #[cfg(feature = "indicatif")]
             if let Some(bar) = &progress {
-                bar.set_message(&format!("Building index (layer {})", layer.0));
+                bar.set_message(format!("Building index (layer {})", layer.0));
             }
 
             let end = range.end;

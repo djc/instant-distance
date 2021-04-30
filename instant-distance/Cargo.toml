@@ -15,7 +15,7 @@ readme = "../README.md"
 with-serde = ["serde", "serde-big-array"]
 
 [dependencies]
-indicatif = { version = "0.15", optional = true }
+indicatif = { version = "0.16", optional = true }
 num_cpus = "1.13"
 ordered-float = "2.0"
 parking_lot = "0.11"
