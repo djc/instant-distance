@@ -7,6 +7,25 @@ use rand::{Rng, SeedableRng};
 use instant_distance::{Builder, Point as _, Search};
 
 #[test]
+fn map() {
+    let points = (0..16)
+        .into_iter()
+        .map(|i| Point(i as f32, i as f32))
+        .collect::<Vec<_>>();
+    let values = vec![
+        "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+        "eleven", "twelve", "thirteen", "fourteen", "fifteen",
+    ];
+
+    let seed = ThreadRng::default().gen::<u64>();
+    println!("map (seed = {})", seed);
+    let map = Builder::default().seed(seed).build(points, values);
+    let mut search = Search::default();
+
+    let _ = map.search(&Point(2.0, 2.0), &mut search);
+}
+
+#[test]
 fn random_heuristic() {
     let (seed, recall) = randomized(Builder::default());
     println!("heuristic (seed = {}) recall = {}", seed, recall);
@@ -38,7 +57,7 @@ fn randomized(builder: Builder) -> (u64, usize) {
         }
     }
 
-    let (hnsw, pids) = builder.seed(seed).build(points);
+    let (hnsw, pids) = builder.seed(seed).build_hnsw(points);
     let mut search = Search::default();
     let results = hnsw.search(&query, &mut search);
     assert!(results.len() >= 100);

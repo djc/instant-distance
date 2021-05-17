@@ -15,7 +15,7 @@ fn build_heuristic(bench: &mut Bencher) {
         .map(|_| Point(rng.gen(), rng.gen()))
         .collect::<Vec<_>>();
 
-    bench.iter(|| Builder::default().seed(seed).build(points.clone()))
+    bench.iter(|| Builder::default().seed(seed).build_hnsw(points.clone()))
 }
 
 /*

@@ -74,8 +74,13 @@ impl Builder {
         self
     }
 
+    /// Build an `HnswMap` with the given sets of points and values
+    pub fn build<P: Point, V: Clone>(self, points: Vec<P>, values: Vec<V>) -> HnswMap<P, V> {
+        HnswMap::new(points, values, self)
+    }
+
     /// Build the `Hnsw` with the given set of points
-    pub fn build<P: Point>(self, points: Vec<P>) -> (Hnsw<P>, Vec<PointId>) {
+    pub fn build_hnsw<P: Point>(self, points: Vec<P>) -> (Hnsw<P>, Vec<PointId>) {
         Hnsw::new(points, self)
     }
 
@@ -119,6 +124,42 @@ impl Default for Heuristic {
             extend_candidates: false,
             keep_pruned: true,
         }
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+pub struct HnswMap<P, V> {
+    hnsw: Hnsw<P>,
+    values: Vec<V>,
+}
+
+impl<P, V> HnswMap<P, V>
+where
+    P: Point,
+    V: Clone,
+{
+    fn new(points: Vec<P>, values: Vec<V>, builder: Builder) -> Self {
+        let (hnsw, ids) = Hnsw::new(points, builder);
+
+        let mut sorted = ids.into_iter().enumerate().collect::<Vec<_>>();
+        sorted.sort_unstable_by(|a, b| a.1.cmp(&b.1));
+        let new = sorted
+            .into_iter()
+            .map(|(src, _)| values[src].clone())
+            .collect();
+
+        Self { hnsw, values: new }
+    }
+
+    pub fn search<'a>(
+        &'a self,
+        point: &P,
+        search: &'a mut Search,
+    ) -> impl Iterator<Item = (f32, &'a V)> + ExactSizeIterator + 'a {
+        self.hnsw.search(point, search).map(move |candidate| {
+            let value = &self.values[candidate.pid.0 as usize];
+            (candidate.distance.into(), value)
+        })
     }
 }
 
