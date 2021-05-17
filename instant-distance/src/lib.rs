@@ -231,7 +231,7 @@ where
             ranges.push((LayerId(num_layers - i - 1), max(start, 1)..cumulative));
         }
 
-        // Insert the first point so that we have an enter point to start searches with.
+        // Initialize data for layers
 
         let mut layers = vec![vec![]; top.0];
         let zero = points
