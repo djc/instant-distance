@@ -18,6 +18,7 @@ mod types;
 pub use types::PointId;
 use types::{Candidate, Layer, LayerId, UpperNode, Visited, ZeroNode, INVALID};
 
+#[derive(Clone)]
 /// Parameters for building the `Hnsw`
 pub struct Builder {
     ef_search: usize,
