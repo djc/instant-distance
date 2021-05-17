@@ -38,7 +38,7 @@ fn randomized(builder: Builder) -> (u64, usize) {
         }
     }
 
-    let (hnsw, pids) = builder.seed(seed).build(&points);
+    let (hnsw, pids) = builder.seed(seed).build(points);
     let mut search = Search::default();
     let results = hnsw.search(&query, &mut search);
     assert!(results.len() >= 100);

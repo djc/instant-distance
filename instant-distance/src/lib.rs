@@ -74,7 +74,7 @@ impl Builder {
     }
 
     /// Build the `Hnsw` with the given set of points
-    pub fn build<P: Point>(self, points: &[P]) -> (Hnsw<P>, Vec<PointId>) {
+    pub fn build<P: Point>(self, points: Vec<P>) -> (Hnsw<P>, Vec<PointId>) {
         Hnsw::new(points, self)
     }
 
@@ -137,7 +137,7 @@ where
         Builder::default()
     }
 
-    fn new(points: &[P], builder: Builder) -> (Self, Vec<PointId>) {
+    fn new(points: Vec<P>, builder: Builder) -> (Self, Vec<PointId>) {
         let ef_search = builder.ef_search;
         let ef_construction = builder.ef_construction;
         let ml = builder.ml;
