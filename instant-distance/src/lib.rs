@@ -155,14 +155,26 @@ where
         &'a self,
         point: &P,
         search: &'a mut Search,
-    ) -> impl Iterator<Item = (f32, &'a P, &'a V)> + ExactSizeIterator + 'a {
-        self.hnsw
-            .search(point, search)
-            .map(move |(distance, pid, point)| {
-                let value = &self.values[pid.0 as usize];
-                (distance, point, value)
-            })
+    ) -> impl Iterator<Item = MapItem<'a, P, V>> + ExactSizeIterator + 'a {
+        self.hnsw.search(point, search).map(move |item| MapItem {
+            distance: item.distance,
+            pid: item.pid,
+            point: item.point,
+            value: &self.values[item.pid.0 as usize],
+        })
     }
+
+    /// Iterate over the keys and values in this index
+    pub fn iter(&self) -> impl Iterator<Item = (PointId, &P)> {
+        self.hnsw.iter()
+    }
+}
+
+pub struct MapItem<'a, P, V> {
+    pub distance: f32,
+    pub pid: PointId,
+    pub point: &'a P,
+    pub value: &'a V,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
