@@ -1,5 +1,5 @@
 use bencher::{benchmark_group, benchmark_main, Bencher};
-use rand::rngs::{StdRng, ThreadRng};
+use rand::rngs::StdRng; //, ThreadRng};
 use rand::{Rng, SeedableRng};
 
 use instant_distance::Builder;
@@ -8,14 +8,18 @@ benchmark_main!(benches);
 benchmark_group!(benches, build_heuristic);
 
 fn build_heuristic(bench: &mut Bencher) {
-    let seed = ThreadRng::default().gen::<u64>();
-    let mut rng = StdRng::seed_from_u64(seed);
-    let points = (0..1024)
+    //let seed = dbg!(ThreadRng::default().gen::<u64>());
+    let mut rng = StdRng::seed_from_u64(11823281459843198809); //seed);
+    let points = (0..512)
         .into_iter()
         .map(|_| Point(rng.gen(), rng.gen()))
         .collect::<Vec<_>>();
 
-    bench.iter(|| Builder::default().seed(seed).build_hnsw(points.clone()))
+    bench.iter(|| {
+        Builder::default()
+            .seed(11823281459843198809)
+            .build_hnsw(points.clone())
+    })
 }
 
 /*

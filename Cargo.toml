@@ -1,5 +1,2 @@
 [workspace]
 members = ["instant-distance", "instant-distance-py"]
-
-[profile.bench]
-debug = true
