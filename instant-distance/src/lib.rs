@@ -155,11 +155,13 @@ where
         &'a self,
         point: &P,
         search: &'a mut Search,
-    ) -> impl Iterator<Item = (f32, &'a V)> + ExactSizeIterator + 'a {
-        self.hnsw.search(point, search).map(move |candidate| {
-            let value = &self.values[candidate.pid.0 as usize];
-            (candidate.distance.into(), value)
-        })
+    ) -> impl Iterator<Item = (f32, &'a P, &'a V)> + ExactSizeIterator + 'a {
+        self.hnsw
+            .search(point, search)
+            .map(move |(distance, pid, point)| {
+                let value = &self.values[pid.0 as usize];
+                (distance, point, value)
+            })
     }
 }
 
@@ -336,14 +338,15 @@ where
     /// The results are returned in the `out` parameter; the number of neighbors to search for
     /// is limited by the size of the `out` parameter, and the number of results found is returned
     /// in the return value.
-    pub fn search<'a>(
-        &self,
+    pub fn search<'a, 'b: 'a>(
+        &'b self,
         point: &P,
         search: &'a mut Search,
-    ) -> impl Iterator<Item = Candidate> + ExactSizeIterator + 'a {
+    ) -> impl Iterator<Item = Item<'b, P>> + ExactSizeIterator + 'a {
         search.reset();
+        let map = move |candidate| Item::new(candidate, self);
         if self.points.is_empty() {
-            return search.iter();
+            return search.iter().map(map);
         }
 
         search.visited.reserve_capacity(self.points.len());
@@ -365,7 +368,7 @@ where
             }
         }
 
-        search.iter()
+        search.iter().map(map)
     }
 
     /// Iterate over the keys and values in this index
@@ -374,6 +377,22 @@ where
             .iter()
             .enumerate()
             .map(|(i, p)| (PointId(i as u32), p))
+    }
+}
+
+pub struct Item<'a, P> {
+    pub distance: f32,
+    pub pid: PointId,
+    pub point: &'a P,
+}
+
+impl<'a, P> Item<'a, P> {
+    fn new(candidate: Candidate, hnsw: &'a Hnsw<P>) -> Self {
+        Self {
+            distance: candidate.distance.into_inner(),
+            pid: candidate.pid,
+            point: &hnsw[candidate.pid],
+        }
     }
 }
 

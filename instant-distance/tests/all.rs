@@ -70,7 +70,7 @@ fn randomized(builder: Builder) -> (u64, usize) {
         .collect::<HashSet<_>>();
     let found = results
         .take(100)
-        .map(|candidate| candidate.pid)
+        .map(|item| item.pid)
         .collect::<HashSet<_>>();
     (seed, forced.intersection(&found).count())
 }
