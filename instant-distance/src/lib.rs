@@ -130,7 +130,7 @@ impl Default for Heuristic {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct HnswMap<P, V> {
     hnsw: Hnsw<P>,
-    values: Vec<V>,
+    pub values: Vec<V>,
 }
 
 impl<P, V> HnswMap<P, V>
