@@ -314,10 +314,17 @@ where
             }
 
             let end = range.end;
-            nodes[range].into_par_iter().for_each(|(_, pid)| {
-                let node = state.zero[*pid].write();
-                state.insert(*pid, node, layer, &layers);
-            });
+            if layer == top {
+                nodes[range].into_iter().for_each(|(_, pid)| {
+                    let node = state.zero[*pid].write();
+                    state.insert(*pid, node, layer, &layers);
+                })
+            } else {
+                nodes[range].into_par_iter().for_each(|(_, pid)| {
+                    let node = state.zero[*pid].write();
+                    state.insert(*pid, node, layer, &layers);
+                });
+            }
 
             // For layers above the zero layer, make a copy of the current state of the zero layer
             // with `nearest` truncated to `M` elements.
