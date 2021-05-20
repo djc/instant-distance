@@ -8,21 +8,34 @@ use instant_distance::{Builder, Point as _, Search};
 
 #[test]
 fn map() {
-    let points = (0..16)
+    let points = (0..5)
         .into_iter()
         .map(|i| Point(i as f32, i as f32))
         .collect::<Vec<_>>();
-    let values = vec![
-        "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
-        "eleven", "twelve", "thirteen", "fourteen", "fifteen",
-    ];
+    let values = vec!["zero", "one", "two", "three", "four"];
 
     let seed = ThreadRng::default().gen::<u64>();
     println!("map (seed = {})", seed);
     let map = Builder::default().seed(seed).build(points, values);
     let mut search = Search::default();
 
-    let _ = map.search(&Point(2.0, 2.0), &mut search);
+    for (i, item) in map.search(&Point(2.0, 2.0), &mut search).enumerate() {
+        match i {
+            0 => {
+                assert_eq!(item.distance, 0.0);
+                assert_eq!(item.value, &"two");
+            }
+            1 | 2 => {
+                assert_eq!(item.distance, 1.4142135);
+                assert!(item.value == &"one" || item.value == &"three");
+            }
+            3 | 4 => {
+                assert_eq!(item.distance, 2.828427);
+                assert!(item.value == &"zero" || item.value == &"four");
+            }
+            _ => unreachable!(),
+        }
+    }
 }
 
 #[test]
