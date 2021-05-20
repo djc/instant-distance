@@ -7,6 +7,7 @@ use rand::{Rng, SeedableRng};
 use instant_distance::{Builder, Point as _, Search};
 
 #[test]
+#[allow(clippy::float_cmp, clippy::approx_constant)]
 fn map() {
     let points = (0..5)
         .into_iter()
