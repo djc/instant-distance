@@ -235,6 +235,7 @@ where
         }
         sizes.push((num, num));
         sizes.reverse();
+        let top = LayerId(sizes.len() - 1);
 
         // Give all points a random layer and sort the list of nodes by descending order for
         // construction. This allows us to copy higher layers to lower layers as construction
@@ -246,34 +247,15 @@ where
             .collect::<Vec<_>>();
         shuffled.sort_unstable();
 
-        let mut new_points = Vec::with_capacity(points.len());
-        let mut new_nodes = Vec::with_capacity(points.len());
         let mut out = vec![INVALID; points.len()];
-        for (_, idx) in shuffled {
-            let pid = PointId(new_nodes.len() as u32);
-            let layer = sizes
-                .iter()
-                .enumerate()
-                .find_map(|(i, &size)| match (pid.0 as usize) < size.1 {
-                    true => Some(i),
-                    false => None,
-                })
-                .unwrap();
-
-            new_points.push(points[idx].clone());
-            new_nodes.push((LayerId(sizes.len() - layer - 1), pid));
-            out[idx] = pid;
-        }
-        let (points, nodes) = (new_points, new_nodes);
-        debug_assert_eq!(nodes.last().unwrap().0, LayerId(0));
-        debug_assert_eq!(nodes.first().unwrap().0, LayerId(sizes.len() - 1));
-
-        // The layer from the first node is our top layer, or the zero layer if we have no nodes.
-
-        let top = match nodes.first() {
-            Some((top, _)) => *top,
-            None => LayerId(0),
-        };
+        let points = shuffled
+            .into_iter()
+            .enumerate()
+            .map(|(i, (_, idx))| {
+                out[idx] = PointId(i as u32);
+                points[idx].clone()
+            })
+            .collect::<Vec<_>>();
 
         // Figure out how many nodes will go on each layer. This helps us allocate memory capacity
         // for each layer in advance, and also helps enable batch insertion of points.
@@ -313,17 +295,15 @@ where
                 bar.set_message(format!("Building index (layer {})", layer.0));
             }
 
+            let inserter = |pid| state.insert(pid, layer, &layers);
+
             let end = range.end;
             if layer == top {
-                nodes[range].into_iter().for_each(|(_, pid)| {
-                    let node = state.zero[*pid].write();
-                    state.insert(*pid, node, layer, &layers);
-                })
+                range.into_iter().for_each(|i| inserter(PointId(i as u32)))
             } else {
-                nodes[range].into_par_iter().for_each(|(_, pid)| {
-                    let node = state.zero[*pid].write();
-                    state.insert(*pid, node, layer, &layers);
-                });
+                range
+                    .into_par_iter()
+                    .for_each(|i| inserter(PointId(i as u32)));
             }
 
             // For layers above the zero layer, make a copy of the current state of the zero layer
@@ -431,21 +411,14 @@ struct Construction<'a, P: Point> {
 impl<'a, P: Point> Construction<'a, P> {
     /// Insert new node in the zero layer
     ///
-    /// * `new`: the `PointId` for the new node
-    /// * `insertion`: a `Search` for shrinking a neighbor set (only used with heuristic neighbor selection)
-    /// * `search`: the result for searching potential neighbors for the new node
-    /// *  `layer` contains all the nodes at the current layer
-    /// * `points` is a slice of all the points in the index
+    /// * `new` is the `PointId` for the new node
+    /// * `layer` contains all the nodes at the current layer
+    /// * `layers` refers to the existing higher-level layers
     ///
     /// Creates the new node, initializing its `nearest` array and updates the nearest neighbors
     /// for the new node's neighbors if necessary before appending the new node to the layer.
-    fn insert(
-        &self,
-        new: PointId,
-        mut node: parking_lot::RwLockWriteGuard<ZeroNode>,
-        layer: LayerId,
-        layers: &[Vec<UpperNode>],
-    ) {
+    fn insert(&self, new: PointId, layer: LayerId, layers: &[Vec<UpperNode>]) {
+        let mut node = self.zero[new].write();
         let (mut search, mut insertion) = self.pool.pop();
         insertion.ef = self.ef_construction;
 
