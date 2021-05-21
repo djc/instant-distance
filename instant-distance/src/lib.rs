@@ -156,17 +156,19 @@ where
         point: &P,
         search: &'a mut Search,
     ) -> impl Iterator<Item = MapItem<'a, P, V>> + ExactSizeIterator + 'a {
-        self.hnsw.search(point, search).map(move |item| MapItem {
-            distance: item.distance,
-            pid: item.pid,
-            point: item.point,
-            value: &self.values[item.pid.0 as usize],
-        })
+        self.hnsw
+            .search(point, search)
+            .map(move |item| MapItem::from(item, self))
     }
 
     /// Iterate over the keys and values in this index
     pub fn iter(&self) -> impl Iterator<Item = (PointId, &P)> {
         self.hnsw.iter()
+    }
+
+    #[doc(hidden)]
+    pub fn get(&self, i: usize, search: &Search) -> Option<MapItem<'_, P, V>> {
+        Some(MapItem::from(self.hnsw.get(i, search)?, self))
     }
 }
 
@@ -175,6 +177,17 @@ pub struct MapItem<'a, P, V> {
     pub pid: PointId,
     pub point: &'a P,
     pub value: &'a V,
+}
+
+impl<'a, P, V> MapItem<'a, P, V> {
+    fn from(item: Item<'a, P>, map: &'a HnswMap<P, V>) -> Self {
+        MapItem {
+            distance: item.distance,
+            pid: item.pid,
+            point: item.point,
+            value: &map.values[item.pid.0 as usize],
+        }
+    }
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -376,6 +389,11 @@ where
             .iter()
             .enumerate()
             .map(|(i, p)| (PointId(i as u32), p))
+    }
+
+    #[doc(hidden)]
+    pub fn get(&self, i: usize, search: &Search) -> Option<Item<'_, P>> {
+        Some(Item::new(search.nearest.get(i).copied()?, self))
     }
 }
 
@@ -745,11 +763,6 @@ impl Search {
 
     fn iter(&self) -> impl Iterator<Item = Candidate> + ExactSizeIterator + '_ {
         self.nearest.iter().copied()
-    }
-
-    #[doc(hidden)]
-    pub fn get(&self, i: usize) -> Option<Candidate> {
-        self.nearest.get(i).copied()
     }
 }
 

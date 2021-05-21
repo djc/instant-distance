@@ -236,13 +236,6 @@ pub struct Candidate {
     pub pid: PointId,
 }
 
-impl Candidate {
-    /// Distance to the neighboring point
-    pub fn distance(&self) -> f32 {
-        *self.distance
-    }
-}
-
 /// References a `Point` in the `Hnsw`
 ///
 /// This can be used to index into the `Hnsw` to refer to the `Point` data.
@@ -259,6 +252,14 @@ impl PointId {
     /// Return the identifier value
     pub fn into_inner(self) -> u32 {
         self.0
+    }
+}
+
+#[doc(hidden)]
+// Not part of the public API; only for use in bindings
+impl From<u32> for PointId {
+    fn from(id: u32) -> Self {
+        PointId(id)
     }
 }
 
