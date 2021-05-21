@@ -5,10 +5,13 @@ use std::io::{BufReader, BufWriter};
 use std::iter::FromIterator;
 
 use instant_distance::Point;
+use pyo3::conversion::IntoPy;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::proc_macro::{pyclass, pymethods, pymodule, pyproto};
 use pyo3::types::{PyList, PyModule};
-use pyo3::{Py, PyAny, PyErr, PyIterProtocol, PyObjectProtocol, PyRef, PyRefMut, PyResult, Python};
+use pyo3::{
+    Py, PyAny, PyErr, PyIterProtocol, PyObject, PyObjectProtocol, PyRef, PyRefMut, PyResult, Python,
+};
 use serde::{Deserialize, Serialize};
 use serde_big_array::big_array;
 
@@ -173,7 +176,7 @@ impl PyIterProtocol for Search {
                 item.map(|item| Neighbor {
                     distance: item.distance,
                     pid: item.pid.into_inner(),
-                    value: None,
+                    value: py.None(),
                 })
             }
             HnswType::Map(map) => {
@@ -182,7 +185,7 @@ impl PyIterProtocol for Search {
                 item.map(|item| Neighbor {
                     distance: item.distance,
                     pid: item.pid.into_inner(),
-                    value: Some(item.value.to_owned()),
+                    value: item.value.into_py(py),
                 })
             }
         };
@@ -319,18 +322,20 @@ struct Neighbor {
     pid: u32,
     /// Value for the neighboring point (only set for `HnswMap` results)
     #[pyo3(get)]
-    value: Option<String>,
+    value: PyObject,
 }
 
 #[pyproto]
 impl PyObjectProtocol for Neighbor {
     fn __repr__(&self) -> PyResult<String> {
-        match &self.value {
-            Some(s) => Ok(format!(
+        match Python::with_gil(|py| self.value.is_none(py)) {
+            false => Ok(format!(
                 "instant_distance.Neighbor(distance={}, pid={}, value={})",
-                self.distance, self.pid, s,
+                self.distance,
+                self.pid,
+                Python::with_gil(|py| self.value.as_ref(py).repr().map(|s| s.to_string()))?,
             )),
-            None => Ok(format!(
+            true => Ok(format!(
                 "instant_distance.Item(distance={}, pid={})",
                 self.distance, self.pid,
             )),
