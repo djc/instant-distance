@@ -24,12 +24,11 @@ def test_hsnw_map():
 
     search = instant_distance.Search()
     hnsw_map.search(embeddings[the_chosen_one], search)
+    first = next(search)
 
-    closest_pid = list(search)[0].pid
-    approx_nearest = hnsw_map.values[closest_pid]
+    approx_nearest = first.value
     actual_word = values[the_chosen_one]
 
-    print("pid:\t\t", closest_pid)
     print("approx word:\t", approx_nearest)
     print("actual word:\t", actual_word)
 

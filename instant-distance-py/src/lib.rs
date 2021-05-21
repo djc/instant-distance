@@ -8,13 +8,13 @@ use instant_distance::Point;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::proc_macro::{pyclass, pymethods, pymodule, pyproto};
 use pyo3::types::{PyList, PyModule};
-use pyo3::{PyAny, PyErr, PyIterProtocol, PyObjectProtocol, PyRef, PyRefMut, PyResult, Python};
+use pyo3::{Py, PyAny, PyErr, PyIterProtocol, PyObjectProtocol, PyRef, PyRefMut, PyResult, Python};
 use serde::{Deserialize, Serialize};
 use serde_big_array::big_array;
 
 #[pymodule]
 fn instant_distance(_: Python, m: &PyModule) -> PyResult<()> {
-    m.add_class::<Candidate>()?;
+    m.add_class::<Neighbor>()?;
     m.add_class::<Heuristic>()?;
     m.add_class::<Config>()?;
     m.add_class::<Search>()?;
@@ -30,10 +30,6 @@ struct HnswMap {
 
 #[pymethods]
 impl HnswMap {
-    #[getter]
-    fn values(&self) -> PyResult<Vec<String>> {
-        Ok(self.inner.values.clone())
-    }
     /// Build the index
     #[staticmethod]
     fn build(points: &PyList, values: Vec<String>, config: &Config) -> PyResult<Self> {
@@ -72,10 +68,10 @@ impl HnswMap {
     /// to the `ef_search` parameter set in the index's `config`.
     ///
     /// For best performance, reusing `Search` objects is recommended.
-    fn search(&self, point: &PyAny, search: &mut Search) -> PyResult<()> {
+    fn search(slf: Py<Self>, point: &PyAny, search: &mut Search, py: Python<'_>) -> PyResult<()> {
         let point = FloatArray::try_from(point)?;
-        let _ = self.inner.search(&point, &mut search.inner);
-        search.cur = Some(0);
+        let _ = slf.try_borrow(py)?.inner.search(&point, &mut search.inner);
+        search.cur = Some((HnswType::Map(slf.clone_ref(py)), 0));
         Ok(())
     }
 }
@@ -129,10 +125,10 @@ impl Hnsw {
     /// to the `ef_search` parameter set in the index's `config`.
     ///
     /// For best performance, reusing `Search` objects is recommended.
-    fn search(&self, point: &PyAny, search: &mut Search) -> PyResult<()> {
+    fn search(slf: Py<Self>, point: &PyAny, search: &mut Search, py: Python<'_>) -> PyResult<()> {
         let point = FloatArray::try_from(point)?;
-        let _ = self.inner.search(&point, &mut search.inner);
-        search.cur = Some(0);
+        let _ = slf.try_borrow(py)?.inner.search(&point, &mut search.inner);
+        search.cur = Some((HnswType::Hnsw(slf.clone_ref(py)), 0));
         Ok(())
     }
 }
@@ -141,7 +137,7 @@ impl Hnsw {
 #[pyclass]
 struct Search {
     inner: instant_distance::Search,
-    cur: Option<usize>,
+    cur: Option<(HnswType, usize)>,
 }
 
 #[pymethods]
@@ -163,26 +159,42 @@ impl PyIterProtocol for Search {
     }
 
     /// Return the next closest point
-    fn __next__(mut slf: PyRefMut<Self>) -> Option<Candidate> {
-        let idx = match &slf.cur {
-            Some(idx) => *idx,
+    fn __next__(mut slf: PyRefMut<Self>) -> Option<Neighbor> {
+        let (index, idx) = match slf.cur.take() {
+            Some(x) => x,
             None => return None,
         };
 
-        let candidate = match slf.inner.get(idx) {
-            Some(c) => c,
-            None => {
-                slf.cur = None;
-                return None;
+        let py = slf.py();
+        let neighbor = match &index {
+            HnswType::Hnsw(hnsw) => {
+                let hnsw = hnsw.as_ref(py).borrow();
+                let item = hnsw.inner.get(idx, &slf.inner);
+                item.map(|item| Neighbor {
+                    distance: item.distance,
+                    pid: item.pid.into_inner(),
+                    value: None,
+                })
+            }
+            HnswType::Map(map) => {
+                let map = map.as_ref(py).borrow();
+                let item = map.inner.get(idx, &slf.inner);
+                item.map(|item| Neighbor {
+                    distance: item.distance,
+                    pid: item.pid.into_inner(),
+                    value: Some(item.value.to_owned()),
+                })
             }
         };
 
-        slf.cur = Some(idx + 1);
-        Some(Candidate {
-            pid: candidate.pid.into_inner(),
-            distance: candidate.distance(),
-        })
+        slf.cur = neighbor.as_ref().map(|_| (index, idx + 1));
+        neighbor
     }
+}
+
+enum HnswType {
+    Hnsw(Py<Hnsw>),
+    Map(Py<HnswMap>),
 }
 
 #[pyclass]
@@ -296,24 +308,33 @@ impl From<Heuristic> for instant_distance::Heuristic {
     }
 }
 
-/// Search buffer and result set
+/// Item found by the nearest neighbor search
 #[pyclass]
-struct Candidate {
-    /// Identifier for the neighboring point
-    #[pyo3(get)]
-    pid: u32,
+struct Neighbor {
     /// Distance to the neighboring point
     #[pyo3(get)]
     distance: f32,
+    /// Identifier for the neighboring point
+    #[pyo3(get)]
+    pid: u32,
+    /// Value for the neighboring point (only set for `HnswMap` results)
+    #[pyo3(get)]
+    value: Option<String>,
 }
 
 #[pyproto]
-impl PyObjectProtocol for Candidate {
+impl PyObjectProtocol for Neighbor {
     fn __repr__(&self) -> PyResult<String> {
-        Ok(format!(
-            "instant_distance.Candidate(pid={}, distance={})",
-            self.pid, self.distance
-        ))
+        match &self.value {
+            Some(s) => Ok(format!(
+                "instant_distance.Neighbor(distance={}, pid={}, value={})",
+                self.distance, self.pid, s,
+            )),
+            None => Ok(format!(
+                "instant_distance.Item(distance={}, pid={})",
+                self.distance, self.pid,
+            )),
+        }
     }
 }
 
