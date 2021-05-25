@@ -56,6 +56,14 @@ optional = false
 python-versions = ">=3.4"
 
 [[package]]
+name = "instant-distance"
+version = "0.3.0"
+description = ""
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "multidict"
 version = "5.1.0"
 description = "multidict implementation"
@@ -93,8 +101,8 @@ multidict = ">=4.0"
 
 [metadata]
 lock-version = "1.1"
-python-versions = "^3.8"
-content-hash = "212df9a4c393687eb6a4999b3089244cf8938ed124d51edc4b9addf0521152a9"
+python-versions = "^3.9"
+content-hash = "4ecbe53b5ee3cf9448df7f79842e75fbc6aef3f8dce888b671ab0e0cbdcc315a"
 
 [metadata.files]
 aiohttp = [
@@ -151,6 +159,9 @@ chardet = [
 idna = [
     {file = "idna-3.1-py3-none-any.whl", hash = "sha256:5205d03e7bcbb919cc9c19885f9920d622ca52448306f2377daede5cf3faac16"},
     {file = "idna-3.1.tar.gz", hash = "sha256:c5b02147e01ea9920e6b0a3f1f7bb833612d507592c837a6c49552768f4054e1"},
+]
+instant-distance = [
+    {file = "instant_distance-0.3.0-cp39-cp39-macosx_10_7_x86_64.whl", hash = "sha256:f4c06a3476e0ebf389ede54d1df41e423d3ec6cef1b75d8834c49cbdf3f1d2cc"},
 ]
 multidict = [
     {file = "multidict-5.1.0-cp36-cp36m-macosx_10_14_x86_64.whl", hash = "sha256:b7993704f1a4b204e71debe6095150d43b2ee6150fa4f44d6d966ec356a8d61f"},
