@@ -32,7 +32,6 @@ instant-segment = "0.5.0"
 use instant_distance::{Builder, Search};
 
 fn main() {
-    //
     let points = vec![Point(255, 0, 0), Point(255, 0, 0), Point(255, 0, 0)];
     let values = vec!["red", "green", "blue"];
 
