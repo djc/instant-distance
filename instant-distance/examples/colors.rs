@@ -1,15 +1,15 @@
 use instant_distance::{Builder, Search};
 
 fn main() {
-    let points = vec![Point(255, 0, 0), Point(255, 0, 0), Point(255, 0, 0)];
+    let points = vec![Point(255, 0, 0), Point(0, 255, 0), Point(0, 0, 255)];
     let values = vec!["red", "green", "blue"];
 
     let map = Builder::default().build(points, values);
     let mut search = Search::default();
 
-    let cambridge_blue = Point(163, 193, 173);
+    let burnt_orange = Point(204, 85, 0);
 
-    let closest_point = map.search(&cambridge_blue, &mut search).next().unwrap();
+    let closest_point = map.search(&burnt_orange, &mut search).next().unwrap();
 
     println!("{:?}", closest_point.value);
 }
