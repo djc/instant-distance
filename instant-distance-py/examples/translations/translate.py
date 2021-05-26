@@ -1,11 +1,10 @@
+import os
 import sys
 import instant_distance
 import aiohttp
 import asyncio
 from progress.bar import IncrementalBar
 from progress.spinner import Spinner
-
-
 
 
 MAX_LINES = 100_000
@@ -19,11 +18,21 @@ vector_paths = {
 
 
 async def download_build_index():
+    """
+    This function downloads pre-trained word vectors trained on Wikipedia using fastText:
+    https://fasttext.cc/docs/en/aligned-vectors.html
+
+    The content is streamed and we take only the first 100,000 lines and drop the longtail
+    of less common words. We intercept each line and use this information to also build
+    an instant-distance index file.
+    """
     id_config = instant_distance.Config()
 
     print("Downloading vector files and building indexes...")
     async with aiohttp.ClientSession() as session:
         for url, path in vector_paths.items():
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+
             lineno = 0
             points = []
             values = []
@@ -32,7 +41,6 @@ async def download_build_index():
                     with open(path, "w") as fd:
                         while True:
                             lineno += 1
-                            bar.next()
 
                             line = await resp.content.readline()
                             if not line:
@@ -58,13 +66,23 @@ async def download_build_index():
                                 # Write out the data to our original .vec files
                                 fd.write(linestr)
 
+                                bar.next()
+
             # Build the instant-distance index and dump it out to a file with .idx suffix
-            print("Building index... (This will take a minute)")
+            print("Building index... (This will take a while)")
             hnsw = instant_distance.HnswMap.build(points, values, id_config)
             hnsw.dump(path.replace(".vec", ".idx"))
 
+
 async def translate(word):
-    pass
+    data_exists = False
+    for path in vector_paths.values():
+        data_exists &= os.path.isfile(path)
+    
+    if not data_exists:
+        print("Word vector data isn't present. Downloading...")
+        await download_build_index()
+
 
 
 async def main():
@@ -72,15 +90,16 @@ async def main():
     try:
         if args[0] == "prepare":
             await download_build_index()
-        elif args[0] == "translate":        
+            exit(0)
+        elif args[0] == "translate":
             await translate(args[1])
+            exit(0)
     except IndexError:
         pass
-    
+
     print(f"usage:\t{sys.argv[0]} prepare\n\t{sys.argv[0]} translate <english word>")
     exit(1)
 
 
 loop = asyncio.get_event_loop()
 loop.run_until_complete(main())
-
