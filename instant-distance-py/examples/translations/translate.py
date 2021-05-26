@@ -61,13 +61,13 @@ async def download_build_index():
                             tokens = linestr.split(" ")
 
                             value = tokens[0]
-                            point = tokens[1:]
+                            point = [float(p) for p in tokens[1:]]
 
                             # We track values here to build the instant-distance index
                             # Every value is prepended with 2 character language code.
                             # This allows us to determine language output later.
                             values.append(lang + value)
-                            points.append([float(p) for p in point])
+                            points.append(point)
 
                             # We'll dump this out to json later
                             word_map[value] = point
@@ -91,7 +91,7 @@ async def translate(word):
         await download_build_index()
 
     print("Loading indexes from filesystem...")
-    with open(WORD_MAP_PATH, "w") as f:
+    with open(WORD_MAP_PATH, "r") as f:
         word_map = json.loads(f.read())
 
     # Get an embedding for the given word
