@@ -8,13 +8,10 @@ from progress.spinner import Spinner
 
 
 MAX_LINES = 100_000
-
-
-vector_paths = {
-    "https://dl.fbaipublicfiles.com/fasttext/vectors-aligned/wiki.en.align.vec": "./data/wiki.en.align.trimmed.vec",
-    "https://dl.fbaipublicfiles.com/fasttext/vectors-aligned/wiki.fr.align.vec": "./data/wiki.fr.align.trimmed.vec",
-    "https://dl.fbaipublicfiles.com/fasttext/vectors-aligned/wiki.it.align.vec": "./data/wiki.it.align.trimmed.vec",
-}
+LANGS = ("en", "fr", "it")
+LANG_REPLACE = "$$lang"
+DL_TEMPLATE = f"https://dl.fbaipublicfiles.com/fasttext/vectors-aligned/wiki.{LANG_REPLACE}.align.vec"
+PATH_TEMPLATE = f"./data/wiki.{LANG_REPLACE}.align.trimmed.vec"
 
 
 async def download_build_index():
@@ -27,20 +24,26 @@ async def download_build_index():
     an instant-distance index file.
     """
     id_config = instant_distance.Config()
+    points = []
+    values = []
 
     print("Downloading vector files and building indexes...")
     async with aiohttp.ClientSession() as session:
-        for url, path in vector_paths.items():
+        for lang in LANGS:
+            # Construct a url for each language and path
+            url = DL_TEMPLATE.replace(LANG_REPLACE, lang)
+            path = PATH_TEMPLATE.replace(LANG_REPLACE, lang)
+
+            # Ensure the directory and files exist
             os.makedirs(os.path.dirname(path), exist_ok=True)
 
             lineno = 0
-            points = []
-            values = []
             with IncrementalBar(f"Downloading {path}", max=MAX_LINES) as bar:
                 async with session.get(url) as resp:
                     with open(path, "w") as fd:
                         while True:
                             lineno += 1
+                            bar.next()
 
                             line = await resp.content.readline()
                             if not line:
@@ -59,30 +62,33 @@ async def download_build_index():
                                 tokens = linestr.split(" ")
 
                                 # We track values here to build the instant-distance index
-                                values.append(tokens[0])
+                                # Every value is prepended with 2 character language code.
+                                # This allows us to determine language output later.
+                                values.append(lang + tokens[0])
                                 vec = tokens[1:]
                                 points.append([float(p) for p in vec])
 
                                 # Write out the data to our original .vec files
                                 fd.write(linestr)
 
-                                bar.next()
-
-            # Build the instant-distance index and dump it out to a file with .idx suffix
-            print("Building index... (This will take a while)")
-            hnsw = instant_distance.HnswMap.build(points, values, id_config)
-            hnsw.dump(path.replace(".vec", ".idx"))
+    # Build the instant-distance index and dump it out to a file with .idx suffix
+    print("Building index... (This will take a while)")
+    hnsw = instant_distance.HnswMap.build(points, values, id_config)
+    hnsw.dump(path.replace(".vec", ".idx"))
 
 
 async def translate(word):
     data_exists = False
-    for path in vector_paths.values():
+    for path in [PATH_TEMPLATE.replace(LANG_REPLACE, lang) for lang in LANGS]:
+        # Ensure .vec and .idx files exist
         data_exists &= os.path.isfile(path)
-    
+        data_exists &= os.path.isfile(path.replace(".vec", ".idx"))
+
     if not data_exists:
-        print("Word vector data isn't present. Downloading...")
+        print("Word vector data aren't present. Downloading...")
         await download_build_index()
 
+    print("Loading indexes from filesystem...")
 
 
 async def main():
