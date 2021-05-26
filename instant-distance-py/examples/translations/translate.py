@@ -1,11 +1,11 @@
+import asyncio
 import os
 import sys
-import instant_distance
+
 import aiohttp
-import asyncio
+import instant_distance
 from progress.bar import IncrementalBar
 from progress.spinner import Spinner
-
 
 MAX_LINES = 100_000
 LANGS = ("en", "fr", "it")
