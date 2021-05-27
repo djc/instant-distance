@@ -22,13 +22,12 @@ async def download_build_index():
     https://fasttext.cc/docs/en/aligned-vectors.html
 
     The content is streamed and we take only the first 100,000 lines and drop the longtail
-    of less common words. We intercept each line and use this information to also build
-    an instant-distance index file.
+    of less common words. We intercept each line and use this information to build
+    an instant-distance index file. We maintain a mapping of english word to embeddings
+    in order to convert the translation input to an embedding.
     """
-    id_config = instant_distance.Config()
     points = []
     values = []
-
     word_map = {}
 
     print("Downloading vector files and building indexes...")
@@ -63,20 +62,21 @@ async def download_build_index():
                             value = tokens[0]
                             point = [float(p) for p in tokens[1:]]
 
-                            # We track values here to build the instant-distance index
-                            # Every value is prepended with 2 character language code.
-                            # This allows us to determine language output later.
-                            values.append(lang + value)
-                            points.append(point)
-
-                            # We'll dump this out to json later
-                            word_map[value] = point
+                            # We only go from english to the other two languages
+                            if lang == "en":
+                                word_map[value] = point
+                            else:
+                                # We track values here to build the instant-distance index
+                                # Every value is prepended with 2 character language code.
+                                # This allows us to determine language output later.
+                                values.append(lang + value)
+                                points.append(point)
 
                             bar.next()
 
     # Build the instant-distance index and dump it out to a file with .idx suffix
     print("Building index... (this will take a while)")
-    hnsw = instant_distance.HnswMap.build(points, values, id_config)
+    hnsw = instant_distance.HnswMap.build(points, values, instant_distance.Config())
     hnsw.dump(BUILT_IDX_PATH)
 
     # Store the mapping from string to embedding in a json file
@@ -85,6 +85,14 @@ async def download_build_index():
 
 
 async def translate(word):
+    """
+    This function relies on the index built in the `download_build_index` function.
+    If the data does not yet exist, it will download and build the index.
+
+    The input is expected to be english. A word is first mapped onto an embeddings
+    from the mapping stored as json. Then we use instant-distance to find the approximate
+    nearest neighbors to that point (embedding) in order to translate to other languages.
+    """
     data_exists = os.path.isfile(BUILT_IDX_PATH) and os.path.isfile(WORD_MAP_PATH)
     if not data_exists:
         print("Instant Distance index not present. Building...")
@@ -105,15 +113,17 @@ async def translate(word):
     search = instant_distance.Search()
     hnsw.search(embedding, search)
 
+    # Print the results
     for result in list(search)[:10]:
-        value = hnsw.values[result.pid]
-        print(f"Language: {value[:2]}, Translation: {value[2:]}")
+        # We know that the first two characters of the value is the language code
+        # from when we built the index.
+        print(f"Language: {result.value[:2]}, Translation: {result.value[2:]}")
 
 
 async def main():
     args = sys.argv[1:]
     try:
-        if args[0] == "prepare":
+        if args[0] == "build":
             await download_build_index()
             exit(0)
         elif args[0] == "translate":
