@@ -33,7 +33,7 @@ async def download_build_index():
     print("Downloading vector files and building indexes...")
     async with aiohttp.ClientSession() as session:
         for lang in LANGS:
-            # Construct a url for each language and path
+            # Construct a url for each language
             url = DL_TEMPLATE.replace(LANG_REPLACE, lang)
 
             # Ensure the directory and files exist
@@ -59,18 +59,20 @@ async def download_build_index():
                             linestr = line.decode("utf-8")
                             tokens = linestr.split(" ")
 
+                            # The first token is the word and the rest
+                            # are the embedding
                             value = tokens[0]
-                            point = [float(p) for p in tokens[1:]]
+                            embedding = [float(p) for p in tokens[1:]]
 
                             # We only go from english to the other two languages
                             if lang == "en":
-                                word_map[value] = point
+                                word_map[value] = embedding
                             else:
                                 # We track values here to build the instant-distance index
                                 # Every value is prepended with 2 character language code.
                                 # This allows us to determine language output later.
                                 values.append(lang + value)
-                                points.append(point)
+                                points.append(embedding)
 
                             bar.next()
 
@@ -79,7 +81,7 @@ async def download_build_index():
     hnsw = instant_distance.HnswMap.build(points, values, instant_distance.Config())
     hnsw.dump(BUILT_IDX_PATH)
 
-    # Store the mapping from string to embedding in a json file
+    # Store the mapping from string to embedding in a .json file
     with open(WORD_MAP_PATH, "w") as f:
         f.write(json.dumps(word_map))
 
@@ -89,7 +91,7 @@ async def translate(word):
     This function relies on the index built in the `download_build_index` function.
     If the data does not yet exist, it will download and build the index.
 
-    The input is expected to be english. A word is first mapped onto an embeddings
+    The input is expected to be english. A word is first mapped onto an embedding
     from the mapping stored as json. Then we use instant-distance to find the approximate
     nearest neighbors to that point (embedding) in order to translate to other languages.
     """
