@@ -9,6 +9,12 @@ English words to French and Italian.
 
 Python 3.9 is required.
 
+First, install the requirements:
+
+```
+pip install -r requirements.txt
+```
+
 Run the following command to translate an english word:
 
 ```
