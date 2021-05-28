@@ -53,28 +53,28 @@ async def download_build_index():
 
                         # We just use the top 100k embeddings to
                         # save on space and time
-                        elif lineno > MAX_LINES:
+                        if lineno > MAX_LINES:
                             break
+                        
+                        linestr = line.decode("utf-8")
+                        tokens = linestr.split(" ")
+
+                        # The first token is the word and the rest
+                        # are the embedding
+                        value = tokens[0]
+                        embedding = [float(p) for p in tokens[1:]]
+
+                        # We only go from english to the other two languages
+                        if lang == "en":
+                            word_map[value] = embedding
                         else:
-                            linestr = line.decode("utf-8")
-                            tokens = linestr.split(" ")
+                            # We track values here to build the instant-distance index
+                            # Every value is prepended with 2 character language code.
+                            # This allows us to determine language output later.
+                            values.append(lang + value)
+                            points.append(embedding)
 
-                            # The first token is the word and the rest
-                            # are the embedding
-                            value = tokens[0]
-                            embedding = [float(p) for p in tokens[1:]]
-
-                            # We only go from english to the other two languages
-                            if lang == "en":
-                                word_map[value] = embedding
-                            else:
-                                # We track values here to build the instant-distance index
-                                # Every value is prepended with 2 character language code.
-                                # This allows us to determine language output later.
-                                values.append(lang + value)
-                                points.append(embedding)
-
-                            bar.next()
+                        bar.next()
 
     # Build the instant-distance index and dump it out to a file with .idx suffix
     print("Building index... (this will take a while)")
@@ -83,7 +83,7 @@ async def download_build_index():
 
     # Store the mapping from string to embedding in a .json file
     with open(WORD_MAP_PATH, "w") as f:
-        f.write(json.dumps(word_map))
+        json.dump(word_map, f)
 
 
 async def translate(word):
@@ -102,12 +102,11 @@ async def translate(word):
 
     print("Loading indexes from filesystem...")
     with open(WORD_MAP_PATH, "r") as f:
-        word_map = json.loads(f.read())
+        word_map = json.load(f)
 
     # Get an embedding for the given word
-    try:
-        embedding = word_map[word]
-    except KeyError:
+    embedding = word_map.get(word)
+    if not embedding:
         print(f"Word not recognized: {word}")
         exit(1)
 
