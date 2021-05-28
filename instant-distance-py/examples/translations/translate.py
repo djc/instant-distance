@@ -21,7 +21,7 @@ async def download_build_index():
     This function downloads pre-trained word vectors trained on Wikipedia using fastText:
     https://fasttext.cc/docs/en/aligned-vectors.html
 
-    The content is streamed and we take only the first 100,000 lines and drop the longtail
+    The content is streamed and we take only the first 100,000 lines and drop the long tail
     of less common words. We intercept each line and use this information to build
     an instant-distance index file. We maintain a mapping of english word to embeddings
     in order to convert the translation input to an embedding.
