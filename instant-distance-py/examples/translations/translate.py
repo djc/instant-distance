@@ -77,6 +77,7 @@ async def download_build_index():
                                 or any(p in value for p in whitespace)
                                 or any(p in value for p in digits)
                             ):
+                                bar.next()
                                 continue
 
                             # We track values here to build the instant-distance index
