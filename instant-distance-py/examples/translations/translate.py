@@ -1,12 +1,12 @@
 import asyncio
 import json
 import os
+from string import digits, punctuation, whitespace
 import sys
 
 import aiohttp
 import instant_distance
 from progress.bar import IncrementalBar
-from progress.spinner import Spinner
 
 MAX_LINES = 100_000
 LANGS = ("en", "fr", "it")
@@ -55,7 +55,7 @@ async def download_build_index():
                         # save on space and time
                         if lineno > MAX_LINES:
                             break
-                        
+
                         linestr = line.decode("utf-8")
                         tokens = linestr.split(" ")
 
@@ -68,9 +68,15 @@ async def download_build_index():
                         if lang == "en":
                             word_map[value] = embedding
                         else:
-                            # Don't index words that exist in english
-                            # to improve the quality of the results.
-                            if value in word_map:
+                            # Don't index words that exist in english or
+                            # that include non-letter characters to improve
+                            # the quality of the results.
+                            if (
+                                value in word_map
+                                or any(p in value for p in punctuation)
+                                or any(p in value for p in whitespace)
+                                or any(p in value for p in digits)
+                            ):
                                 continue
 
                             # We track values here to build the instant-distance index
