@@ -68,6 +68,11 @@ async def download_build_index():
                         if lang == "en":
                             word_map[value] = embedding
                         else:
+                            # Don't index words that exist in english
+                            # to improve the quality of the results.
+                            if value in word_map:
+                                continue
+
                             # We track values here to build the instant-distance index
                             # Every value is prepended with 2 character language code.
                             # This allows us to determine language output later.
