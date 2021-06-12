@@ -23,7 +23,7 @@ point in a set.
 
 ```toml
 [dependencies]
-instant-segment = "0.5.0"
+instant-distance = "0.5.0"
 ```
 
 ## Example
