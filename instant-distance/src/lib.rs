@@ -442,7 +442,7 @@ impl<'a, P: Point> Construction<'a, P> {
 
         let point = &self.points[new];
         search.reset();
-        search.push(PointId(0), point, &self.points);
+        search.push(PointId(0), point, self.points);
         let num = if layer.is_zero() { M * 2 } else { M };
 
         for cur in self.top.descend() {
@@ -453,11 +453,11 @@ impl<'a, P: Point> Construction<'a, P> {
             };
             match cur > layer {
                 true => {
-                    search.search(point, layers[cur.0 - 1].as_slice(), &self.points, num);
+                    search.search(point, layers[cur.0 - 1].as_slice(), self.points, num);
                     search.cull();
                 }
                 false => {
-                    search.search(point, self.zero, &self.points, num);
+                    search.search(point, self.zero, self.points, num);
                     break;
                 }
             }
