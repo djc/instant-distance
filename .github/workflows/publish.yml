@@ -1,0 +1,57 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - py-*
+
+jobs:
+  Unix:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: [3.7, 3.8, 3.9]
+
+    runs-on: ${{ matrix.os }}
+    environment: "Publish wheels"
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python }}
+          architecture: x64
+      - name: Publish
+        uses: messense/maturin-action@v1
+        with:
+          command: publish
+          args: -m instant-distance-py/Cargo.toml
+                --no-sdist
+                --username __token__
+                --password ${{ secrets.PYPI_TOKEN }}
+                --interpreter python${{ matrix.python }}
+
+  Windows:
+    runs-on: windows-latest
+    environment: "Publish wheels"
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Publish all versions
+        uses: messense/maturin-action@v1
+        with:
+          command: publish
+          args: -m instant-distance-py/Cargo.toml
+                --no-sdist
+                --username __token__
+                --password ${{ secrets.PYPI_TOKEN }}
