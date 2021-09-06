@@ -15,7 +15,7 @@ approximate nearest neighbors. This implementation powers the
 
 Instant Distance is an implementation of a fast approximate nearest neighbor
 search algorithm. The algorithm is used to find the closest point(s) to a given
-point in a set.
+point in a set. As one example, it can be used to make [simple translations][translations].
 
 ## Using the library
 
@@ -73,3 +73,4 @@ make test-python
 
 [paper]: https://arxiv.org/abs/1603.09320
 [ids]: https://instantdomainsearch.com/
+[translations]: https://instantdomainsearch.com/engineering/how-to-use-fasttext-for-instant-translations
