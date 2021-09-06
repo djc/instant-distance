@@ -4,6 +4,11 @@ version = "0.3.0"
 authors = ["Dirkjan Ochtman <dirkjan@ochtman.nl>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
+workspace = ".."
+description = "Fast minimal implementation of HNSW maps for approximate nearest neighbors searches"
+homepage = "https://github.com/InstantDomain/instant-distance"
+repository = "https://github.com/InstantDomain/instant-distance"
+readme = "../README.md"
 
 [lib]
 name = "instant_distance"
