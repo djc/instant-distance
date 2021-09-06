@@ -37,6 +37,25 @@ jobs:
           command: test
           args: -p instant-distance --all-features
 
+  test-python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: -p instant-distance-py --release
+      - name: Test Python bindings
+        run: |
+          sudo apt-get install -y wamerican
+          cp target/release/libinstant_distance.so instant-distance-py/test/instant_distance.so
+          PYTHONPATH=instant-distance-py/test/ python3 -m test
+
   lint:
     runs-on: ubuntu-latest
     steps:
