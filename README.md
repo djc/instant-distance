@@ -2,7 +2,7 @@
 
 # Instant Distance: fast HNSW indexing
 
-[![Build status](https://github.com/InstantDomainSearch/instant-distance/workflows/CI/badge.svg)](https://github.com/djc/quinn/actions?query=workflow%3ACI)
+[![Build status](https://github.com/InstantDomain/instant-distance/workflows/CI/badge.svg)](https://github.com/InstantDomain/instant-distance/actions?query=workflow%3ACI)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE-MIT)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE-APACHE)
 
