@@ -495,7 +495,6 @@ impl<'a, P: Point> Construction<'a, P> {
                 self.zero[pid]
                     .write()
                     .rewrite(found.iter().map(|candidate| candidate.pid));
-                node.set(i, pid);
             } else {
                 // Find the correct index to insert at to keep the neighbor's neighbors sorted
                 let old = &self.points[pid];
@@ -514,8 +513,8 @@ impl<'a, P: Point> Construction<'a, P> {
                     .unwrap_or_else(|e| e);
 
                 self.zero[pid].write().insert(idx, new);
-                node.set(i, pid);
             }
+            node.set(i, pid);
         }
 
         #[cfg(feature = "indicatif")]
