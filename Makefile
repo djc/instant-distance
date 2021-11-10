@@ -5,4 +5,4 @@ test-python:
 
 clean:
 	cargo clean
-	rm instant-distance-py/test/instant_distance.so
+	rm -f instant-distance-py/test/instant_distance.so
