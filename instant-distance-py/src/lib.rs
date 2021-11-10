@@ -7,11 +7,9 @@ use std::iter::FromIterator;
 use instant_distance::Point;
 use pyo3::conversion::IntoPy;
 use pyo3::exceptions::{PyTypeError, PyValueError};
-use pyo3::proc_macro::{pyclass, pymethods, pymodule, pyproto};
+use pyo3::proc_macro::{pyclass, pymethods, pymodule};
 use pyo3::types::{PyList, PyModule, PyString};
-use pyo3::{
-    Py, PyAny, PyErr, PyIterProtocol, PyObject, PyObjectProtocol, PyRef, PyRefMut, PyResult, Python,
-};
+use pyo3::{Py, PyAny, PyErr, PyObject, PyRef, PyRefMut, PyResult, Python};
 use serde::{Deserialize, Serialize};
 use serde_big_array::big_array;
 
@@ -158,10 +156,7 @@ impl Search {
             cur: None,
         }
     }
-}
 
-#[pyproto]
-impl PyIterProtocol for Search {
     fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
         slf
     }
@@ -330,8 +325,8 @@ struct Neighbor {
     value: PyObject,
 }
 
-#[pyproto]
-impl PyObjectProtocol for Neighbor {
+#[pymethods]
+impl Neighbor {
     fn __repr__(&self) -> PyResult<String> {
         match Python::with_gil(|py| self.value.is_none(py)) {
             false => Ok(format!(
