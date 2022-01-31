@@ -18,7 +18,7 @@ with-serde = ["serde", "serde-big-array"]
 indicatif = { version = "0.16", optional = true }
 num_cpus = "1.13"
 ordered-float = "2.0"
-parking_lot = "0.11"
+parking_lot = "0.12"
 rand = { version = "0.8", features = ["small_rng"] }
 rayon = "1.5"
 serde = { version = "1.0.118", features = ["derive"], optional = true }
