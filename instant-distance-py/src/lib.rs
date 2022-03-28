@@ -11,7 +11,7 @@ use pyo3::proc_macro::{pyclass, pymethods, pymodule};
 use pyo3::types::{PyList, PyModule, PyString};
 use pyo3::{Py, PyAny, PyErr, PyObject, PyRef, PyRefMut, PyResult, Python};
 use serde::{Deserialize, Serialize};
-use serde_big_array::big_array;
+use serde_big_array::BigArray;
 
 #[pymodule]
 fn instant_distance(_: Python, m: &PyModule) -> PyResult<()> {
@@ -361,8 +361,6 @@ impl TryFrom<&PyAny> for FloatArray {
         Ok(new)
     }
 }
-
-big_array! { BigArray; DIMENSIONS }
 
 impl Point for FloatArray {
     fn distance(&self, rhs: &Self) -> f32 {

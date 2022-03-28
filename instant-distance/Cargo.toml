@@ -1,6 +1,6 @@
 [package]
 name = "instant-distance"
-version = "0.5.0"
+version = "0.5.1"
 license = "MIT OR Apache-2.0"
 authors = ["Dirkjan Ochtman <dirkjan@ochtman.nl>"]
 edition = "2018"
@@ -18,11 +18,11 @@ with-serde = ["serde", "serde-big-array"]
 indicatif = { version = "0.16", optional = true }
 num_cpus = "1.13"
 ordered-float = "2.0"
-parking_lot = "0.11"
+parking_lot = "0.12"
 rand = { version = "0.8", features = ["small_rng"] }
 rayon = "1.5"
 serde = { version = "1.0.118", features = ["derive"], optional = true }
-serde-big-array = { version = "0.3.1", optional = true }
+serde-big-array = { version = "0.4.1", optional = true }
 
 [dev-dependencies]
 bencher = "0.1.5"

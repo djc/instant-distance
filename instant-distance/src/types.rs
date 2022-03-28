@@ -6,7 +6,7 @@ use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "serde-big-array")]
-use serde_big_array::big_array;
+use serde_big_array::BigArray;
 
 use crate::{Hnsw, Point, M};
 
@@ -83,9 +83,6 @@ impl<'a> Layer for &'a [UpperNode] {
 pub(crate) struct ZeroNode(
     #[cfg_attr(feature = "serde", serde(with = "BigArray"))] pub(crate) [PointId; M * 2],
 );
-
-#[cfg(feature = "serde-big-array")]
-big_array! { BigArray; }
 
 impl ZeroNode {
     pub(crate) fn rewrite(&mut self, mut iter: impl Iterator<Item = PointId>) {
