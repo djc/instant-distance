@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "translations"
+version = "0.1.0"
+description = ""
+authors = ["Nick Rempel <nick@instant.ca>"]
+license = "Apache-2"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+aiohttp = "^3.8.1"
+progress = "^1.6"
+instant-distance = "^0.3.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
