@@ -217,7 +217,6 @@ where
         let progress = builder.progress;
         #[cfg(feature = "indicatif")]
         if let Some(bar) = &progress {
-            bar.set_draw_delta(1_000);
             bar.set_length(points.len() as u64);
             bar.set_message("Build index (preparation)");
         }
