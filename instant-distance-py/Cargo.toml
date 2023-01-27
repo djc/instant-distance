@@ -2,7 +2,8 @@
 name = "instant-distance-py"
 version = "0.3.2"
 authors = ["Dirkjan Ochtman <dirkjan@ochtman.nl>"]
-edition = "2018"
+edition = "2021"
+rust-version = "1.58"
 license = "MIT OR Apache-2.0"
 workspace = ".."
 description = "Fast minimal implementation of HNSW maps for approximate nearest neighbors searches"

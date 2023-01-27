@@ -16,7 +16,7 @@ fn map() {
     let values = vec!["zero", "one", "two", "three", "four"];
 
     let seed = ThreadRng::default().gen::<u64>();
-    println!("map (seed = {})", seed);
+    println!("map (seed = {seed})");
     let map = Builder::default().seed(seed).build(points, values);
     let mut search = Search::default();
 
@@ -42,15 +42,15 @@ fn map() {
 #[test]
 fn random_heuristic() {
     let (seed, recall) = randomized(Builder::default());
-    println!("heuristic (seed = {}) recall = {}", seed, recall);
-    assert!(recall > 97, "expected at least 98, got {}", recall);
+    println!("heuristic (seed = {seed}) recall = {recall}");
+    assert!(recall > 97, "expected at least 98, got {recall}");
 }
 
 #[test]
 fn random_simple() {
     let (seed, recall) = randomized(Builder::default().select_heuristic(None));
-    println!("simple (seed = {}) recall = {}", seed, recall);
-    assert!(recall > 90, "expected at least 90, got {}", recall);
+    println!("simple (seed = {seed}) recall = {recall}");
+    assert!(recall > 90, "expected at least 90, got {recall}");
 }
 
 fn randomized(builder: Builder) -> (u64, usize) {
