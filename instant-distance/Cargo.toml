@@ -2,7 +2,6 @@
 name = "instant-distance"
 version = "0.6.0"
 license = "MIT OR Apache-2.0"
-authors = ["Dirkjan Ochtman <dirkjan@ochtman.nl>"]
 edition = "2021"
 rust-version = "1.58"
 description = "Fast minimal implementation of HNSW maps for approximate nearest neighbors searches"
