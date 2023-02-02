@@ -31,7 +31,6 @@ jobs:
         with:
           command: publish
           args: -m instant-distance-py/Cargo.toml
-                --no-sdist
                 --username __token__
                 --password ${{ secrets.PYPI_TOKEN }}
                 --interpreter python${{ matrix.python }}
@@ -52,6 +51,5 @@ jobs:
         with:
           command: publish
           args: -m instant-distance-py/Cargo.toml
-                --no-sdist
                 --username __token__
                 --password ${{ secrets.PYPI_TOKEN }}

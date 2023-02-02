@@ -1,3 +1,6 @@
+[project]
+name = "instant-distance"
+
 [build-system]
-requires = ["maturin >= 0.11, < 0.12"]
+requires = ["maturin >= 0.14, < 0.15"]
 build-backend = "maturin"
