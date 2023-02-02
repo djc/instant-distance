@@ -6,10 +6,10 @@ on:
       - py-*
 
 jobs:
-  Unix:
+  All:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
         python: ["3.8", "3.9", "3.10", "3.11"]
 
     runs-on: ${{ matrix.os }}
@@ -34,22 +34,3 @@ jobs:
                 --username __token__
                 --password ${{ secrets.PYPI_TOKEN }}
                 --interpreter python${{ matrix.python }}
-
-  Windows:
-    runs-on: windows-latest
-    environment: "Publish wheels"
-
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - name: Publish all versions
-        uses: messense/maturin-action@v1
-        with:
-          command: publish
-          args: -m instant-distance-py/Cargo.toml
-                --username __token__
-                --password ${{ secrets.PYPI_TOKEN }}
