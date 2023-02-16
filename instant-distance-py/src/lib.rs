@@ -5,15 +5,17 @@ use std::convert::TryFrom;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::iter::FromIterator;
+use std::marker::PhantomData;
 
+use distance_metrics::EuclidMetric;
+use distance_metrics::Metric;
 use instant_distance::Point;
 use pyo3::conversion::IntoPy;
-use pyo3::exceptions::{PyTypeError, PyValueError};
+use pyo3::exceptions::PyValueError;
 use pyo3::types::{PyList, PyModule, PyString};
 use pyo3::{pyclass, pymethods, pymodule};
 use pyo3::{Py, PyAny, PyErr, PyObject, PyRef, PyRefMut, PyResult, Python};
 use serde::{Deserialize, Serialize};
-use serde_big_array::BigArray;
 
 #[pymodule]
 #[pyo3(name = "instant_distance")]
@@ -62,8 +64,8 @@ struct HnswMap {
 
 #[derive(Deserialize, Serialize)]
 enum HnswMapWithMetric {
-    Euclid(instant_distance::HnswMap<FloatArray, MapValue>),
-    Cosine(instant_distance::HnswMap<FloatArray, MapValue>),
+    Euclid(instant_distance::HnswMap<FloatArray<EuclidMetric>, MapValue>),
+    Cosine(instant_distance::HnswMap<FloatArray<EuclidMetric>, MapValue>),
 }
 
 #[pymethods]
@@ -126,9 +128,6 @@ impl HnswMap {
 }
 
 /// An instance of hierarchical navigable small worlds
-///
-/// For now, this is specialized to only support 300-element (32-bit) float vectors
-/// with a squared Euclidean distance metric.
 #[pyclass]
 struct Hnsw {
     inner: HnswWithMetric,
@@ -136,8 +135,8 @@ struct Hnsw {
 
 #[derive(Deserialize, Serialize)]
 enum HnswWithMetric {
-    Euclid(instant_distance::Hnsw<FloatArray>),
-    Cosine(instant_distance::Hnsw<FloatArray>),
+    Euclid(instant_distance::Hnsw<FloatArray<EuclidMetric>>),
+    Cosine(instant_distance::Hnsw<FloatArray<EuclidMetric>>),
 }
 
 #[pymethods]
@@ -414,73 +413,42 @@ impl Neighbor {
     }
 }
 
-#[repr(align(32))]
 #[derive(Clone, Deserialize, Serialize)]
-struct FloatArray(#[serde(with = "BigArray")] [f32; DIMENSIONS]);
+struct FloatArray<M> {
+    array: Vec<f32>,
+    phantom: PhantomData<M>,
+}
 
-impl FloatArray {
+impl<M: Metric> FloatArray<M> {
     fn try_from_pylist(list: &PyList) -> Result<Vec<Self>, PyErr> {
         list.into_iter().map(FloatArray::try_from).collect()
     }
 }
 
-impl TryFrom<&PyAny> for FloatArray {
-    type Error = PyErr;
-
-    fn try_from(value: &PyAny) -> Result<Self, Self::Error> {
-        let mut new = FloatArray([0.0; DIMENSIONS]);
-        for (i, val) in value.iter()?.enumerate() {
-            match i >= DIMENSIONS {
-                true => return Err(PyTypeError::new_err("point array too long")),
-                false => new.0[i] = val?.extract::<f32>()?,
-            }
+impl<M: Metric> From<Vec<f32>> for FloatArray<M> {
+    fn from(array: Vec<f32>) -> Self {
+        Self {
+            array,
+            phantom: PhantomData,
         }
-        Ok(new)
     }
 }
 
-impl Point for FloatArray {
+impl<M: Metric> TryFrom<&PyAny> for FloatArray<M> {
+    type Error = PyErr;
+
+    fn try_from(value: &PyAny) -> Result<Self, Self::Error> {
+        let array: Vec<f32> = value
+            .iter()?
+            .map(|val| val.and_then(|v| v.extract::<f32>()))
+            .collect::<Result<_, _>>()?;
+        Ok(Self::from(array))
+    }
+}
+
+impl<M: Metric + Clone + Sync> Point for FloatArray<M> {
     fn distance(&self, rhs: &Self) -> f32 {
-        #[cfg(target_arch = "x86_64")]
-        {
-            use std::arch::x86_64::{
-                _mm256_castps256_ps128, _mm256_extractf128_ps, _mm256_fmadd_ps, _mm256_load_ps,
-                _mm256_setzero_ps, _mm256_sub_ps, _mm_add_ps, _mm_add_ss, _mm_cvtss_f32,
-                _mm_fmadd_ps, _mm_load_ps, _mm_movehl_ps, _mm_shuffle_ps, _mm_sub_ps,
-            };
-            debug_assert_eq!(self.0.len() % 8, 4);
-
-            unsafe {
-                let mut acc_8x = _mm256_setzero_ps();
-                for (lh_slice, rh_slice) in self.0.chunks_exact(8).zip(rhs.0.chunks_exact(8)) {
-                    let lh_8x = _mm256_load_ps(lh_slice.as_ptr());
-                    let rh_8x = _mm256_load_ps(rh_slice.as_ptr());
-                    let diff = _mm256_sub_ps(lh_8x, rh_8x);
-                    acc_8x = _mm256_fmadd_ps(diff, diff, acc_8x);
-                }
-
-                let mut acc_4x = _mm256_extractf128_ps(acc_8x, 1); // upper half
-                let right = _mm256_castps256_ps128(acc_8x); // lower half
-                acc_4x = _mm_add_ps(acc_4x, right); // sum halves
-
-                let lh_4x = _mm_load_ps(self.0[DIMENSIONS - 4..].as_ptr());
-                let rh_4x = _mm_load_ps(rhs.0[DIMENSIONS - 4..].as_ptr());
-                let diff = _mm_sub_ps(lh_4x, rh_4x);
-                acc_4x = _mm_fmadd_ps(diff, diff, acc_4x);
-
-                let lower = _mm_movehl_ps(acc_4x, acc_4x);
-                acc_4x = _mm_add_ps(acc_4x, lower);
-                let upper = _mm_shuffle_ps(acc_4x, acc_4x, 0x1);
-                acc_4x = _mm_add_ss(acc_4x, upper);
-                _mm_cvtss_f32(acc_4x)
-            }
-        }
-        #[cfg(not(target_arch = "x86_64"))]
-        self.0
-            .iter()
-            .zip(rhs.0.iter())
-            .map(|(&a, &b)| (a - b).powi(2))
-            .sum::<f32>()
+        M::distance(&self.array, &rhs.array)
     }
 }
 
@@ -504,5 +472,3 @@ impl IntoPy<Py<PyAny>> for &'_ MapValue {
         }
     }
 }
-
-const DIMENSIONS: usize = 300;
