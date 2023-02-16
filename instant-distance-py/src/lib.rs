@@ -7,8 +7,8 @@ use std::io::{BufReader, BufWriter};
 use std::iter::FromIterator;
 use std::marker::PhantomData;
 
-use distance_metrics::EuclidMetric;
 use distance_metrics::Metric;
+use distance_metrics::{CosineMetric, EuclidMetric};
 use instant_distance::Point;
 use pyo3::conversion::IntoPy;
 use pyo3::exceptions::PyValueError;
@@ -65,7 +65,7 @@ struct HnswMap {
 #[derive(Deserialize, Serialize)]
 enum HnswMapWithMetric {
     Euclid(instant_distance::HnswMap<FloatArray<EuclidMetric>, MapValue>),
-    Cosine(instant_distance::HnswMap<FloatArray<EuclidMetric>, MapValue>),
+    Cosine(instant_distance::HnswMap<FloatArray<CosineMetric>, MapValue>),
 }
 
 #[pymethods]
@@ -136,7 +136,7 @@ struct Hnsw {
 #[derive(Deserialize, Serialize)]
 enum HnswWithMetric {
     Euclid(instant_distance::Hnsw<FloatArray<EuclidMetric>>),
-    Cosine(instant_distance::Hnsw<FloatArray<EuclidMetric>>),
+    Cosine(instant_distance::Hnsw<FloatArray<CosineMetric>>),
 }
 
 #[pymethods]
@@ -426,7 +426,8 @@ impl<M: Metric> FloatArray<M> {
 }
 
 impl<M: Metric> From<Vec<f32>> for FloatArray<M> {
-    fn from(array: Vec<f32>) -> Self {
+    fn from(mut array: Vec<f32>) -> Self {
+        M::preprocess(&mut array);
         Self {
             array,
             phantom: PhantomData,

@@ -11,6 +11,9 @@ pub mod simd_neon;
 pub trait Metric {
     /// Greater the value - more distant the vectors
     fn distance(v1: &[f32], v2: &[f32]) -> f32;
+
+    /// Necessary vector transformations performed before adding it to the collection (like normalization)
+    fn preprocess(vector: &mut [f32]);
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -54,6 +57,72 @@ impl Metric for EuclidMetric {
 
         euclid_distance(v1, v2)
     }
+
+    fn preprocess(_vector: &mut [f32]) {
+        // no-op
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct CosineMetric {}
+
+impl Metric for CosineMetric {
+    fn distance(v1: &[f32], v2: &[f32]) -> f32 {
+        #[cfg(target_arch = "x86_64")]
+        {
+            if is_x86_feature_detected!("avx")
+                && is_x86_feature_detected!("fma")
+                && v1.len() >= MIN_DIM_SIZE_AVX
+            {
+                return 1.0 - unsafe { simd_avx::dot_similarity_avx(v1, v2) };
+            }
+        }
+
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            if is_x86_feature_detected!("sse") && v1.len() >= MIN_DIM_SIZE_SIMD {
+                return 1.0 - unsafe { simd_sse::dot_similarity_sse(v1, v2) };
+            }
+        }
+
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            if std::arch::is_aarch64_feature_detected!("neon") && v1.len() >= MIN_DIM_SIZE_SIMD {
+                return 1.0 - unsafe { simd_neon::dot_similarity_neon(v1, v2) };
+            }
+        }
+
+        1.0 - dot_similarity(v1, v2)
+    }
+
+    fn preprocess(vector: &mut [f32]) {
+        #[cfg(target_arch = "x86_64")]
+        {
+            if is_x86_feature_detected!("avx")
+                && is_x86_feature_detected!("fma")
+                && vector.len() >= MIN_DIM_SIZE_AVX
+            {
+                return unsafe { simd_avx::cosine_preprocess_avx(vector) };
+            }
+        }
+
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            if is_x86_feature_detected!("sse") && vector.len() >= MIN_DIM_SIZE_SIMD {
+                return unsafe { simd_sse::cosine_preprocess_sse(vector) };
+            }
+        }
+
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            if std::arch::is_aarch64_feature_detected!("neon") && vector.len() >= MIN_DIM_SIZE_SIMD
+            {
+                return unsafe { simd_neon::cosine_preprocess_neon(vector) };
+            }
+        }
+
+        cosine_preprocess(vector);
+    }
 }
 
 pub fn euclid_distance(v1: &[f32], v2: &[f32]) -> f32 {
@@ -64,6 +133,21 @@ pub fn euclid_distance(v1: &[f32], v2: &[f32]) -> f32 {
         .map(|(a, b)| (a - b).powi(2))
         .sum();
     s.abs().sqrt()
+}
+
+pub fn cosine_preprocess(vector: &mut [f32]) {
+    let mut length: f32 = vector.iter().map(|x| x * x).sum();
+    if length < f32::EPSILON {
+        return;
+    }
+    length = length.sqrt();
+    for x in vector.iter_mut() {
+        *x /= length;
+    }
+}
+
+pub fn dot_similarity(v1: &[f32], v2: &[f32]) -> f32 {
+    v1.iter().zip(v2).map(|(a, b)| a * b).sum()
 }
 
 pub fn legacy_distance(lhs: &FloatArray, rhs: &FloatArray) -> f32 {
