@@ -1,0 +1,21 @@
+[package]
+name = "distance-metrics"
+version = "0.6.0"
+license = "MIT OR Apache-2.0"
+edition = "2021"
+rust-version = "1.58"
+homepage = "https://github.com/InstantDomain/instant-distance"
+repository = "https://github.com/InstantDomain/instant-distance"
+documentation = "https://docs.rs/instant-distance"
+workspace = ".."
+readme = "../README.md"
+
+[dependencies]
+
+[dev-dependencies]
+bencher = "0.1.5"
+rand = { version = "0.8", features = ["small_rng"] }
+
+[[bench]]
+name = "all"
+harness = false

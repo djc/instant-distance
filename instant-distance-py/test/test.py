@@ -1,9 +1,10 @@
 import instant_distance, random
 
 
-def test_hsnw():
+def test_hsnw(distance_metric=instant_distance.DistanceMetric.Euclid):
     points = [[random.random() for _ in range(300)] for _ in range(1024)]
     config = instant_distance.Config()
+    config.distance_metric = distance_metric
     (hnsw, ids) = instant_distance.Hnsw.build(points, config)
     p = [random.random() for _ in range(300)]
     search = instant_distance.Search()
@@ -12,7 +13,7 @@ def test_hsnw():
         print(candidate)
 
 
-def test_hsnw_map():
+def test_hsnw_map(distance_metric=instant_distance.DistanceMetric.Euclid):
     the_chosen_one = 123
 
     embeddings = [[random.random() for _ in range(300)] for _ in range(1024)]
@@ -20,6 +21,7 @@ def test_hsnw_map():
         values = f.read().splitlines()[1024:]
 
     config = instant_distance.Config()
+    config.distance_metric = distance_metric
     hnsw_map = instant_distance.HnswMap.build(embeddings, values, config)
 
     search = instant_distance.Search()
@@ -38,3 +40,5 @@ def test_hsnw_map():
 if __name__ == "__main__":
     test_hsnw()
     test_hsnw_map()
+    test_hsnw(instant_distance.DistanceMetric.Cosine)
+    test_hsnw_map(instant_distance.DistanceMetric.Cosine)
