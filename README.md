@@ -32,7 +32,7 @@ instant-distance = "0.5.0"
 use instant_distance::{Builder, Search};
 
 fn main() {
-    let points = vec![Point(255, 0, 0), Point(255, 0, 0), Point(255, 0, 0)];
+    let points = vec![Point(255, 0, 0), Point(0, 255, 0), Point(0, 0, 255)];
     let values = vec!["red", "green", "blue"];
 
     let map = Builder::default().build(points, values);
