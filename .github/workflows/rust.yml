@@ -53,7 +53,7 @@ jobs:
       - name: Test Python bindings
         run: |
           sudo apt-get install -y wamerican
-          cp target/release/libinstant_distance.so instant-distance-py/test/instant_distance.so
+          cp target/release/libinstant_distance_py.so instant-distance-py/test/instant_distance.so
           PYTHONPATH=instant-distance-py/test/ python3 -m test
 
   lint:
