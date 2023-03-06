@@ -14,7 +14,11 @@ fn build_heuristic(bench: &mut Bencher) {
         .map(|_| Point(rng.gen(), rng.gen()))
         .collect::<Vec<_>>();
 
-    bench.iter(|| Builder::default().seed(SEED).build_hnsw(points.clone()))
+    bench.iter(|| {
+        Builder::default()
+            .seed(SEED)
+            .build_hnsw::<Point, Point, Vec<Point>>(points.clone())
+    })
 }
 
 const SEED: u64 = 123456789;

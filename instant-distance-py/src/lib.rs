@@ -29,7 +29,7 @@ fn instant_distance_py(_: Python, m: &PyModule) -> PyResult<()> {
 
 #[pyclass]
 struct HnswMap {
-    inner: instant_distance::HnswMap<FloatArray, MapValue>,
+    inner: instant_distance::HnswMap<FloatArray, MapValue, Vec<FloatArray>>,
 }
 
 #[pymethods]
@@ -54,11 +54,10 @@ impl HnswMap {
     /// Load an index from the given file name
     #[staticmethod]
     fn load(fname: &str) -> PyResult<Self> {
-        let hnsw_map =
-            bincode::deserialize_from::<_, instant_distance::HnswMap<FloatArray, MapValue>>(
-                BufReader::with_capacity(32 * 1024 * 1024, File::open(fname)?),
-            )
-            .map_err(|e| PyValueError::new_err(format!("deserialization error: {e:?}")))?;
+        let hnsw_map = bincode::deserialize_from::<_, instant_distance::HnswMap<_, _, _>>(
+            BufReader::with_capacity(32 * 1024 * 1024, File::open(fname)?),
+        )
+        .map_err(|e| PyValueError::new_err(format!("deserialization error: {e:?}")))?;
         Ok(Self { inner: hnsw_map })
     }
 
@@ -91,7 +90,7 @@ impl HnswMap {
 /// with a squared Euclidean distance metric.
 #[pyclass]
 struct Hnsw {
-    inner: instant_distance::Hnsw<FloatArray>,
+    inner: instant_distance::Hnsw<FloatArray, Vec<FloatArray>>,
 }
 
 #[pymethods]
@@ -112,7 +111,7 @@ impl Hnsw {
     /// Load an index from the given file name
     #[staticmethod]
     fn load(fname: &str) -> PyResult<Self> {
-        let hnsw = bincode::deserialize_from::<_, instant_distance::Hnsw<FloatArray>>(
+        let hnsw = bincode::deserialize_from::<_, instant_distance::Hnsw<_, _>>(
             BufReader::with_capacity(32 * 1024 * 1024, File::open(fname)?),
         )
         .map_err(|e| PyValueError::new_err(format!("deserialization error: {e:?}")))?;
@@ -145,7 +144,7 @@ impl Hnsw {
 /// Search buffer and result set
 #[pyclass]
 struct Search {
-    inner: instant_distance::Search,
+    inner: instant_distance::Search<FloatArray>,
     cur: Option<(HnswType, usize)>,
 }
 

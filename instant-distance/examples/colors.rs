@@ -4,7 +4,7 @@ fn main() {
     let points = vec![Point(255, 0, 0), Point(0, 255, 0), Point(0, 0, 255)];
     let values = vec!["red", "green", "blue"];
 
-    let map = Builder::default().build(points, values);
+    let map = Builder::default().build::<Point, Point, &str, Vec<Point>>(points, values);
     let mut search = Search::default();
 
     let burnt_orange = Point(204, 85, 0);

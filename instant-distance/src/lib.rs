@@ -1,6 +1,8 @@
 use std::cmp::{max, Ordering, Reverse};
 use std::collections::BinaryHeap;
 use std::collections::HashSet;
+use std::marker::PhantomData;
+use std::ops::Index;
 #[cfg(feature = "indicatif")]
 use std::sync::atomic::{self, AtomicUsize};
 
@@ -75,12 +77,23 @@ impl Builder {
     }
 
     /// Build an `HnswMap` with the given sets of points and values
-    pub fn build<P: Point, V: Clone>(self, points: Vec<P>, values: Vec<V>) -> HnswMap<P, V> {
+    pub fn build<T, P, V, S>(self, points: Vec<T>, values: Vec<V>) -> HnswMap<P, V, S>
+    where
+        P: Point,
+        V: Clone,
+        S: Default + From<Vec<T>> + Len + Index<PointId, Output = P> + Sync,
+        for<'a> &'a S: IntoIterator<Item = &'a P>,
+    {
         HnswMap::new(points, values, self)
     }
 
     /// Build the `Hnsw` with the given set of points
-    pub fn build_hnsw<P: Point>(self, points: Vec<P>) -> (Hnsw<P>, Vec<PointId>) {
+    pub fn build_hnsw<T, P, S>(self, points: Vec<T>) -> (Hnsw<P, S>, Vec<PointId>)
+    where
+        P: Point,
+        S: Default + From<Vec<T>> + Len + Index<PointId, Output = P> + Sync,
+        for<'a> &'a S: IntoIterator<Item = &'a P>,
+    {
         Hnsw::new(points, self)
     }
 
@@ -128,17 +141,26 @@ impl Default for Heuristic {
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-pub struct HnswMap<P, V> {
-    hnsw: Hnsw<P>,
+pub struct HnswMap<P, V, S> {
+    #[cfg_attr(
+        feature = "serde",
+        serde(bound(deserialize = "Hnsw<P, S>: Deserialize<'de>"))
+    )]
+    hnsw: Hnsw<P, S>,
     pub values: Vec<V>,
 }
 
-impl<P, V> HnswMap<P, V>
+impl<P, V, S> HnswMap<P, V, S>
 where
     P: Point,
     V: Clone,
+    S: Default + Len + Index<PointId, Output = P> + Sync,
+    for<'a> &'a S: IntoIterator<Item = &'a P>,
 {
-    fn new(points: Vec<P>, values: Vec<V>, builder: Builder) -> Self {
+    fn new<T>(points: Vec<T>, values: Vec<V>, builder: Builder) -> Self
+    where
+        S: From<Vec<T>>,
+    {
         let (hnsw, ids) = Hnsw::new(points, builder);
 
         let mut sorted = ids.into_iter().enumerate().collect::<Vec<_>>();
@@ -154,7 +176,7 @@ where
     pub fn search<'a>(
         &'a self,
         point: &P,
-        search: &'a mut Search,
+        search: &'a mut Search<P>,
     ) -> impl Iterator<Item = MapItem<'a, P, V>> + ExactSizeIterator + 'a {
         self.hnsw
             .search(point, search)
@@ -167,7 +189,7 @@ where
     }
 
     #[doc(hidden)]
-    pub fn get(&self, i: usize, search: &Search) -> Option<MapItem<'_, P, V>> {
+    pub fn get(&self, i: usize, search: &Search<P>) -> Option<MapItem<'_, P, V>> {
         Some(MapItem::from(self.hnsw.get(i, search)?, self))
     }
 }
@@ -180,7 +202,7 @@ pub struct MapItem<'a, P, V> {
 }
 
 impl<'a, P, V> MapItem<'a, P, V> {
-    fn from(item: Item<'a, P>, map: &'a HnswMap<P, V>) -> Self {
+    fn from<S>(item: Item<'a, P>, map: &'a HnswMap<P, V, S>) -> Self {
         MapItem {
             distance: item.distance,
             pid: item.pid,
@@ -191,22 +213,28 @@ impl<'a, P, V> MapItem<'a, P, V> {
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-pub struct Hnsw<P> {
+pub struct Hnsw<P, S> {
     ef_search: usize,
-    points: Vec<P>,
+    points: S,
     zero: Vec<ZeroNode>,
     layers: Vec<Vec<UpperNode>>,
+    phantom: PhantomData<P>,
 }
 
-impl<P> Hnsw<P>
+impl<P, S> Hnsw<P, S>
 where
     P: Point,
+    S: Default + Len + Index<PointId, Output = P> + Sync,
+    for<'a> &'a S: IntoIterator<Item = &'a P>,
 {
     pub fn builder() -> Builder {
         Builder::default()
     }
 
-    fn new(points: Vec<P>, builder: Builder) -> (Self, Vec<PointId>) {
+    fn new<T>(points: Vec<T>, builder: Builder) -> (Self, Vec<PointId>)
+    where
+        S: From<Vec<T>>,
+    {
         let ef_search = builder.ef_search;
         let ef_construction = builder.ef_construction;
         let ml = builder.ml;
@@ -226,8 +254,9 @@ where
                 Self {
                     ef_search,
                     zero: Vec::new(),
-                    points: Vec::new(),
+                    points: Default::default(),
                     layers: Vec::new(),
+                    phantom: PhantomData,
                 },
                 Vec::new(),
             );
@@ -260,14 +289,21 @@ where
         shuffled.sort_unstable();
 
         let mut out = vec![INVALID; points.len()];
+        let mut points = points
+            .into_iter()
+            .map(|p| Some(p))
+            .collect::<Vec<Option<_>>>();
         let points = shuffled
             .into_iter()
             .enumerate()
             .map(|(i, (_, idx))| {
                 out[idx] = PointId(i as u32);
-                points[idx].clone()
+                points[idx]
+                    .take()
+                    .expect("Point should be present as it's wrapped in Option above")
             })
             .collect::<Vec<_>>();
+        let points: S = points.into();
 
         // Figure out how many nodes will go on each layer. This helps us allocate memory capacity
         // for each layer in advance, and also helps enable batch insertion of points.
@@ -284,13 +320,13 @@ where
 
         let mut layers = vec![vec![]; top.0];
         let zero = points
-            .iter()
+            .into_iter()
             .map(|_| RwLock::new(ZeroNode::default()))
             .collect::<Vec<_>>();
 
         let state = Construction {
             zero: zero.as_slice(),
-            pool: SearchPool::new(points.len()),
+            pool: SearchPool::new(zero.len()),
             top,
             points: &points,
             heuristic,
@@ -339,6 +375,7 @@ where
                 zero: zero.into_iter().map(|node| node.into_inner()).collect(),
                 points,
                 layers,
+                phantom: PhantomData,
             },
             out,
         )
@@ -352,7 +389,7 @@ where
     pub fn search<'a, 'b: 'a>(
         &'b self,
         point: &P,
-        search: &'a mut Search,
+        search: &'a mut Search<P>,
     ) -> impl Iterator<Item = Item<'b, P>> + ExactSizeIterator + 'a {
         search.reset();
         let map = move |candidate| Item::new(candidate, self);
@@ -385,13 +422,13 @@ where
     /// Iterate over the keys and values in this index
     pub fn iter(&self) -> impl Iterator<Item = (PointId, &P)> {
         self.points
-            .iter()
+            .into_iter()
             .enumerate()
             .map(|(i, p)| (PointId(i as u32), p))
     }
 
     #[doc(hidden)]
-    pub fn get(&self, i: usize, search: &Search) -> Option<Item<'_, P>> {
+    pub fn get(&self, i: usize, search: &Search<P>) -> Option<Item<'_, P>> {
         Some(Item::new(search.nearest.get(i).copied()?, self))
     }
 }
@@ -403,7 +440,10 @@ pub struct Item<'a, P> {
 }
 
 impl<'a, P> Item<'a, P> {
-    fn new(candidate: Candidate, hnsw: &'a Hnsw<P>) -> Self {
+    fn new<S>(candidate: Candidate, hnsw: &'a Hnsw<P, S>) -> Self
+    where
+        S: Index<PointId, Output = P>,
+    {
         Self {
             distance: candidate.distance.into_inner(),
             pid: candidate.pid,
@@ -412,11 +452,11 @@ impl<'a, P> Item<'a, P> {
     }
 }
 
-struct Construction<'a, P: Point> {
+struct Construction<'a, P: Point, S> {
     zero: &'a [RwLock<ZeroNode>],
-    pool: SearchPool,
+    pool: SearchPool<P>,
     top: LayerId,
-    points: &'a [P],
+    points: &'a S,
     heuristic: Option<Heuristic>,
     ef_construction: usize,
     #[cfg(feature = "indicatif")]
@@ -425,7 +465,11 @@ struct Construction<'a, P: Point> {
     done: AtomicUsize,
 }
 
-impl<'a, P: Point> Construction<'a, P> {
+impl<'a, P, S> Construction<'a, P, S>
+where
+    P: Point,
+    S: Index<PointId, Output = P>,
+{
     /// Insert new node in the zero layer
     ///
     /// * `new` is the `PointId` for the new node
@@ -528,12 +572,14 @@ impl<'a, P: Point> Construction<'a, P> {
     }
 }
 
-struct SearchPool {
-    pool: Mutex<Vec<(Search, Search)>>,
+type SearchPoolItem<P> = (Search<P>, Search<P>);
+
+struct SearchPool<P: Point> {
+    pool: Mutex<Vec<SearchPoolItem<P>>>,
     len: usize,
 }
 
-impl SearchPool {
+impl<P: Point> SearchPool<P> {
     fn new(len: usize) -> Self {
         Self {
             pool: Mutex::new(Vec::new()),
@@ -541,14 +587,14 @@ impl SearchPool {
         }
     }
 
-    fn pop(&self) -> (Search, Search) {
+    fn pop(&self) -> SearchPoolItem<P> {
         match self.pool.lock().pop() {
             Some(res) => res,
             None => (Search::new(self.len), Search::new(self.len)),
         }
     }
 
-    fn push(&self, item: (Search, Search)) {
+    fn push(&self, item: SearchPoolItem<P>) {
         self.pool.lock().push(item);
     }
 }
@@ -557,7 +603,7 @@ impl SearchPool {
 ///
 /// In particular, this contains most of the state used in algorithm 2. The structure is
 /// initialized by using `push()` to add the initial enter points.
-pub struct Search {
+pub struct Search<P: Point> {
     /// Nodes visited so far (`v` in the paper)
     visited: Visited,
     /// Candidates for further inspection (`C` in the paper)
@@ -571,9 +617,11 @@ pub struct Search {
     discarded: Vec<Candidate>,
     /// Maximum number of nearest neighbors to retain (`ef` in the paper)
     ef: usize,
+    /// PhantomData to bind the Metric parameter
+    phantom: PhantomData<P>,
 }
 
-impl Search {
+impl<P: Point> Search<P> {
     fn new(capacity: usize) -> Self {
         Self {
             visited: Visited::with_capacity(capacity),
@@ -595,7 +643,13 @@ impl Search {
     ///
     /// Invariants: `self.nearest` should be in sorted (nearest first) order, and should be
     /// truncated to `self.ef`.
-    fn search<L: Layer, P: Point>(&mut self, point: &P, layer: L, points: &[P], links: usize) {
+    fn search<L: Layer, S: Index<PointId, Output = P>>(
+        &mut self,
+        point: &P,
+        layer: L,
+        points: &S,
+        links: usize,
+    ) {
         while let Some(Reverse(candidate)) = self.candidates.pop() {
             if let Some(furthest) = self.nearest.last() {
                 if candidate.distance > furthest.distance {
@@ -613,13 +667,13 @@ impl Search {
         }
     }
 
-    fn add_neighbor_heuristic<L: Layer, P: Point>(
+    fn add_neighbor_heuristic<L: Layer, S: Index<PointId, Output = P>>(
         &mut self,
         new: PointId,
         current: impl Iterator<Item = PointId>,
         layer: L,
         point: &P,
-        points: &[P],
+        points: &S,
         params: Heuristic,
     ) -> &[Candidate] {
         self.reset();
@@ -633,11 +687,11 @@ impl Search {
     /// Heuristically sort and truncate neighbors in `self.nearest`
     ///
     /// Invariant: `self.nearest` must be in sorted (nearest first) order.
-    fn select_heuristic<L: Layer, P: Point>(
+    fn select_heuristic<L: Layer, S: Index<PointId, Output = P>>(
         &mut self,
         point: &P,
         layer: L,
-        points: &[P],
+        points: &S,
         params: Heuristic,
     ) -> &[Candidate] {
         self.working.clear();
@@ -701,7 +755,7 @@ impl Search {
     ///
     /// Will immediately return if the node has been considered before. This implements
     /// the inner loop from the paper's algorithm 2.
-    fn push<P: Point>(&mut self, pid: PointId, point: &P, points: &[P]) {
+    fn push<S: Index<PointId, Output = P>>(&mut self, pid: PointId, point: &P, points: &S) {
         if !self.visited.insert(pid) {
             return;
         }
@@ -745,6 +799,7 @@ impl Search {
             working,
             discarded,
             ef: _,
+            phantom: _,
         } = self;
 
         visited.clear();
@@ -764,7 +819,7 @@ impl Search {
     }
 }
 
-impl Default for Search {
+impl<P: Point> Default for Search<P> {
     fn default() -> Self {
         Self {
             visited: Visited::with_capacity(0),
@@ -773,11 +828,34 @@ impl Default for Search {
             working: Vec::new(),
             discarded: Vec::new(),
             ef: 1,
+            phantom: PhantomData,
         }
     }
 }
 
-pub trait Point: Clone + Sync {
+pub trait Len {
+    fn len(&self) -> usize;
+
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl<T> Len for Vec<T> {
+    fn len(&self) -> usize {
+        Vec::len(self)
+    }
+}
+
+impl<P> Index<PointId> for Vec<P> {
+    type Output = P;
+
+    fn index(&self, index: PointId) -> &Self::Output {
+        Vec::index(self, index.0 as usize)
+    }
+}
+
+pub trait Point: Clone + Send + Sync {
     fn distance(&self, other: &Self) -> f32;
 }
 

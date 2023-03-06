@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "serde-big-array")]
 use serde_big_array::BigArray;
 
-use crate::{Hnsw, Point, M};
+use crate::{Hnsw, M};
 
 pub(crate) struct Visited {
     store: Vec<u8>,
@@ -266,19 +266,14 @@ impl Default for PointId {
     }
 }
 
-impl<P> Index<PointId> for Hnsw<P> {
+impl<P, S> Index<PointId> for Hnsw<P, S>
+where
+    S: Index<PointId, Output = P>,
+{
     type Output = P;
 
     fn index(&self, index: PointId) -> &Self::Output {
-        &self.points[index.0 as usize]
-    }
-}
-
-impl<P: Point> Index<PointId> for [P] {
-    type Output = P;
-
-    fn index(&self, index: PointId) -> &Self::Output {
-        &self[index.0 as usize]
+        &self.points[index]
     }
 }
 

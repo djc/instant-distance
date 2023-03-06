@@ -21,7 +21,11 @@ fn build(bench: &mut Bencher) {
         .map(|_| FloatArray([rng.gen(); 300]))
         .collect::<Vec<_>>();
 
-    bench.iter(|| Builder::default().seed(SEED).build_hnsw(points.clone()));
+    bench.iter(|| {
+        Builder::default()
+            .seed(SEED)
+            .build_hnsw::<_, _, Vec<FloatArray>>(points.clone())
+    });
 }
 
 fn query(bench: &mut Bencher) {
@@ -29,7 +33,9 @@ fn query(bench: &mut Bencher) {
     let points = (0..1024)
         .map(|_| FloatArray([rng.gen(); 300]))
         .collect::<Vec<_>>();
-    let (hnsw, _) = Builder::default().seed(SEED).build_hnsw(points);
+    let (hnsw, _) = Builder::default()
+        .seed(SEED)
+        .build_hnsw::<_, _, Vec<FloatArray>>(points);
     let point = FloatArray([rng.gen(); 300]);
 
     bench.iter(|| {

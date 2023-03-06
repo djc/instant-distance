@@ -17,7 +17,9 @@ fn map() {
 
     let seed = ThreadRng::default().gen::<u64>();
     println!("map (seed = {seed})");
-    let map = Builder::default().seed(seed).build(points, values);
+    let map = Builder::default()
+        .seed(seed)
+        .build::<Point, Point, &str, Vec<Point>>(points, values);
     let mut search = Search::default();
 
     for (i, item) in map.search(&Point(2.0, 2.0), &mut search).enumerate() {
@@ -71,7 +73,7 @@ fn randomized(builder: Builder) -> (u64, usize) {
         }
     }
 
-    let (hnsw, pids) = builder.seed(seed).build_hnsw(points);
+    let (hnsw, pids) = builder.seed(seed).build_hnsw::<_, _, Vec<Point>>(points);
     let mut search = Search::default();
     let results = hnsw.search(&query, &mut search);
     assert!(results.len() >= 100);
