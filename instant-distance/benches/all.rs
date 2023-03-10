@@ -10,7 +10,6 @@ benchmark_group!(benches, build_heuristic);
 fn build_heuristic(bench: &mut Bencher) {
     let mut rng = StdRng::seed_from_u64(SEED);
     let points = (0..1024)
-        .into_iter()
         .map(|_| Point(rng.gen(), rng.gen()))
         .collect::<Vec<_>>();
 

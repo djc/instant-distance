@@ -10,7 +10,6 @@ use instant_distance::{Builder, Point as _, Search};
 #[allow(clippy::float_cmp, clippy::approx_constant)]
 fn map() {
     let points = (0..5)
-        .into_iter()
         .map(|i| Point(i as f32, i as f32))
         .collect::<Vec<_>>();
     let values = vec!["zero", "one", "two", "three", "four"];
@@ -57,7 +56,6 @@ fn randomized(builder: Builder) -> (u64, usize) {
     let seed = ThreadRng::default().gen::<u64>();
     let mut rng = StdRng::seed_from_u64(seed);
     let points = (0..1024)
-        .into_iter()
         .map(|_| Point(rng.gen(), rng.gen()))
         .collect::<Vec<_>>();
 
