@@ -266,8 +266,9 @@ impl Default for PointId {
     }
 }
 
-impl<P, S> Index<PointId> for Hnsw<P, S>
+impl<P, M, S> Index<PointId> for Hnsw<P, M, S>
 where
+    P: ?Sized,
     S: Index<PointId, Output = P>,
 {
     type Output = P;

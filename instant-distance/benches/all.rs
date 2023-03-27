@@ -2,7 +2,7 @@ use bencher::{benchmark_group, benchmark_main, Bencher};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
-use instant_distance::Builder;
+use instant_distance::{Builder, Metric};
 
 benchmark_main!(benches);
 benchmark_group!(benches, build_heuristic);
@@ -11,13 +11,13 @@ fn build_heuristic(bench: &mut Bencher) {
     let mut rng = StdRng::seed_from_u64(SEED);
     let points = (0..1024)
         .into_iter()
-        .map(|_| Point(rng.gen(), rng.gen()))
+        .map(|_| [rng.gen(), rng.gen()])
         .collect::<Vec<_>>();
 
     bench.iter(|| {
         Builder::default()
             .seed(SEED)
-            .build_hnsw::<Point, Point, Vec<Point>>(points.clone())
+            .build_hnsw::<[f32; 2], [f32; 2], EuclidMetric, Vec<[f32; 2]>>(points.clone())
     })
 }
 
@@ -51,12 +51,15 @@ fn randomized(builder: Builder) -> (u64, usize) {
 }
 */
 
-#[derive(Clone, Copy, Debug)]
-struct Point(f32, f32);
+struct EuclidMetric;
 
-impl instant_distance::Point for Point {
-    fn distance(&self, other: &Self) -> f32 {
+impl Metric<[f32; 2]> for EuclidMetric {
+    fn distance(a: &[f32; 2], b: &[f32; 2]) -> f32 {
         // Euclidean distance metric
-        ((self.0 - other.0).powi(2) + (self.1 - other.1).powi(2)).sqrt()
+        a.iter()
+            .zip(b.iter())
+            .map(|(&a, &b)| (a - b).powi(2))
+            .sum::<f32>()
+            .sqrt()
     }
 }

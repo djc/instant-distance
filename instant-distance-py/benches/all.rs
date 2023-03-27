@@ -1,7 +1,7 @@
 use bencher::{benchmark_group, benchmark_main, Bencher};
 
-use instant_distance::{Builder, Point, Search};
-use instant_distance_py::FloatArray;
+use instant_distance::{Builder, Metric, Search};
+use instant_distance_py::{EuclidMetric, FloatArray};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 benchmark_main!(benches);
@@ -12,7 +12,7 @@ fn distance(bench: &mut Bencher) {
     let point_a = FloatArray([rng.gen(); 300]);
     let point_b = FloatArray([rng.gen(); 300]);
 
-    bench.iter(|| point_a.distance(&point_b));
+    bench.iter(|| EuclidMetric::distance(&point_a, &point_b));
 }
 
 fn build(bench: &mut Bencher) {
@@ -24,7 +24,7 @@ fn build(bench: &mut Bencher) {
     bench.iter(|| {
         Builder::default()
             .seed(SEED)
-            .build_hnsw::<_, _, Vec<FloatArray>>(points.clone())
+            .build_hnsw::<_, _, EuclidMetric, Vec<FloatArray>>(points.clone())
     });
 }
 
@@ -35,7 +35,7 @@ fn query(bench: &mut Bencher) {
         .collect::<Vec<_>>();
     let (hnsw, _) = Builder::default()
         .seed(SEED)
-        .build_hnsw::<_, _, Vec<FloatArray>>(points);
+        .build_hnsw::<_, _, EuclidMetric, Vec<FloatArray>>(points);
     let point = FloatArray([rng.gen(); 300]);
 
     bench.iter(|| {

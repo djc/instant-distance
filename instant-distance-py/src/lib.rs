@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::iter::FromIterator;
 
-use instant_distance::Point;
+use instant_distance::Metric;
 use pyo3::conversion::IntoPy;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::types::{PyList, PyModule, PyString};
@@ -29,7 +29,7 @@ fn instant_distance_py(_: Python, m: &PyModule) -> PyResult<()> {
 
 #[pyclass]
 struct HnswMap {
-    inner: instant_distance::HnswMap<FloatArray, MapValue, Vec<FloatArray>>,
+    inner: instant_distance::HnswMap<FloatArray, EuclidMetric, MapValue, Vec<FloatArray>>,
 }
 
 #[pymethods]
@@ -54,7 +54,7 @@ impl HnswMap {
     /// Load an index from the given file name
     #[staticmethod]
     fn load(fname: &str) -> PyResult<Self> {
-        let hnsw_map = bincode::deserialize_from::<_, instant_distance::HnswMap<_, _, _>>(
+        let hnsw_map = bincode::deserialize_from::<_, instant_distance::HnswMap<_, _, _, _>>(
             BufReader::with_capacity(32 * 1024 * 1024, File::open(fname)?),
         )
         .map_err(|e| PyValueError::new_err(format!("deserialization error: {e:?}")))?;
@@ -90,7 +90,7 @@ impl HnswMap {
 /// with a squared Euclidean distance metric.
 #[pyclass]
 struct Hnsw {
-    inner: instant_distance::Hnsw<FloatArray, Vec<FloatArray>>,
+    inner: instant_distance::Hnsw<FloatArray, EuclidMetric, Vec<FloatArray>>,
 }
 
 #[pymethods]
@@ -111,7 +111,7 @@ impl Hnsw {
     /// Load an index from the given file name
     #[staticmethod]
     fn load(fname: &str) -> PyResult<Self> {
-        let hnsw = bincode::deserialize_from::<_, instant_distance::Hnsw<_, _>>(
+        let hnsw = bincode::deserialize_from::<_, instant_distance::Hnsw<_, _, _>>(
             BufReader::with_capacity(32 * 1024 * 1024, File::open(fname)?),
         )
         .map_err(|e| PyValueError::new_err(format!("deserialization error: {e:?}")))?;
@@ -144,7 +144,7 @@ impl Hnsw {
 /// Search buffer and result set
 #[pyclass]
 struct Search {
-    inner: instant_distance::Search<FloatArray>,
+    inner: instant_distance::Search<FloatArray, EuclidMetric>,
     cur: Option<(HnswType, usize)>,
 }
 
@@ -364,8 +364,11 @@ impl TryFrom<&PyAny> for FloatArray {
     }
 }
 
-impl Point for FloatArray {
-    fn distance(&self, rhs: &Self) -> f32 {
+#[derive(Clone, Copy, Deserialize, Serialize)]
+pub struct EuclidMetric;
+
+impl Metric<FloatArray> for EuclidMetric {
+    fn distance(lhs: &FloatArray, rhs: &FloatArray) -> f32 {
         #[cfg(target_arch = "x86_64")]
         {
             use std::arch::x86_64::{
@@ -373,11 +376,11 @@ impl Point for FloatArray {
                 _mm256_setzero_ps, _mm256_sub_ps, _mm_add_ps, _mm_add_ss, _mm_cvtss_f32,
                 _mm_fmadd_ps, _mm_load_ps, _mm_movehl_ps, _mm_shuffle_ps, _mm_sub_ps,
             };
-            debug_assert_eq!(self.0.len() % 8, 4);
+            debug_assert_eq!(lhs.0.len() % 8, 4);
 
             unsafe {
                 let mut acc_8x = _mm256_setzero_ps();
-                for (lh_slice, rh_slice) in self.0.chunks_exact(8).zip(rhs.0.chunks_exact(8)) {
+                for (lh_slice, rh_slice) in lhs.0.chunks_exact(8).zip(rhs.0.chunks_exact(8)) {
                     let lh_8x = _mm256_load_ps(lh_slice.as_ptr());
                     let rh_8x = _mm256_load_ps(rh_slice.as_ptr());
                     let diff = _mm256_sub_ps(lh_8x, rh_8x);
@@ -388,7 +391,7 @@ impl Point for FloatArray {
                 let right = _mm256_castps256_ps128(acc_8x); // lower half
                 acc_4x = _mm_add_ps(acc_4x, right); // sum halves
 
-                let lh_4x = _mm_load_ps(self.0[DIMENSIONS - 4..].as_ptr());
+                let lh_4x = _mm_load_ps(lhs.0[DIMENSIONS - 4..].as_ptr());
                 let rh_4x = _mm_load_ps(rhs.0[DIMENSIONS - 4..].as_ptr());
                 let diff = _mm_sub_ps(lh_4x, rh_4x);
                 acc_4x = _mm_fmadd_ps(diff, diff, acc_4x);
@@ -401,7 +404,7 @@ impl Point for FloatArray {
             }
         }
         #[cfg(not(target_arch = "x86_64"))]
-        self.0
+        lhs.0
             .iter()
             .zip(rhs.0.iter())
             .map(|(&a, &b)| (a - b).powi(2))
