@@ -92,7 +92,7 @@ struct Point(f32, f32);
 
 impl instant_distance::Point for Point {
     fn distance(&self, other: &Self) -> f32 {
-        // Euclidean distance metricØ
+        // Euclidean distance metric
         ((self.0 - other.0).powi(2) + (self.1 - other.1).powi(2)).sqrt()
     }
 }
