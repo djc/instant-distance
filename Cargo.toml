@@ -1,5 +1,6 @@
 [workspace]
 members = ["instant-distance", "instant-distance-py"]
+resolver = "2"
 
 [profile.bench]
 debug = true
