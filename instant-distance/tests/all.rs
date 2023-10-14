@@ -4,13 +4,13 @@ use ordered_float::OrderedFloat;
 use rand::rngs::{StdRng, ThreadRng};
 use rand::{Rng, SeedableRng};
 
-use instant_distance::{Builder, Point as _, Search};
+use instant_distance::{Builder, Element, Point as _, PointId, PointRef, Search};
 
 #[test]
 fn neighbors_regression() {
     for _ in 0..10 {
         let points = (0..5)
-            .map(|i| Point(i as f32, i as f32))
+            .map(|i| Point([i as f32, i as f32]))
             .collect::<Vec<_>>();
         let values = vec!["zero", "one", "two", "three", "four"];
 
@@ -30,7 +30,7 @@ fn neighbors_regression() {
         let mut search = Search::default();
 
         let search_results = map
-            .search(&Point(2.0, 2.0), &mut search)
+            .search(&Point([2.0, 2.0]), &mut search)
             .map(|item| (item.distance, item.value))
             .collect::<Vec<_>>();
 
@@ -50,7 +50,7 @@ fn neighbors_regression() {
 #[allow(clippy::float_cmp, clippy::approx_constant)]
 fn map() {
     let points = (0..5)
-        .map(|i| Point(i as f32, i as f32))
+        .map(|i| Point([i as f32, i as f32]))
         .collect::<Vec<_>>();
     let values = vec!["zero", "one", "two", "three", "four"];
 
@@ -59,7 +59,10 @@ fn map() {
     let map = Builder::default().seed(seed).build(points, values);
     let mut search = Search::default();
 
-    for (i, item) in map.search(&Point(2.0, 2.0), &mut search).enumerate() {
+    let search_results = map.search(&Point([2.0, 2.0]), &mut search);
+    assert_eq!(search_results.len(), 5);
+
+    for (i, item) in search_results.enumerate() {
         match i {
             0 => {
                 assert_eq!(item.distance, 0.0);
@@ -95,14 +98,16 @@ fn random_simple() {
 fn randomized(builder: Builder) -> (u64, usize) {
     let seed = ThreadRng::default().gen::<u64>();
     let mut rng = StdRng::seed_from_u64(seed);
-    let points = (0..1024)
-        .map(|_| Point(rng.gen(), rng.gen()))
-        .collect::<Vec<_>>();
+    let points = (0..1024).map(|_| Point(rng.gen())).collect::<Vec<_>>();
 
-    let query = Point(rng.gen(), rng.gen());
+    let query = Point(rng.gen());
+    let query = query.as_slice();
+    let query = PointRef::from_data(&query);
     let mut nearest = Vec::with_capacity(256);
     for (i, p) in points.iter().enumerate() {
-        nearest.push((OrderedFloat::from(query.distance(p)), i));
+        let p = p.as_slice();
+        let p = PointRef::from_data(&p);
+        nearest.push((OrderedFloat::from(query.distance(&p)), i));
         if nearest.len() >= 200 {
             nearest.sort_unstable();
             nearest.truncate(100);
@@ -128,11 +133,16 @@ fn randomized(builder: Builder) -> (u64, usize) {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Point(f32, f32);
+struct Point([f32; 2]);
 
 impl instant_distance::Point for Point {
+    const STRIDE: usize = 2;
+    type Element = f32;
+    fn as_slice(&self) -> &[Self::Element] {
+        &self.0
+    }
+
     fn distance(&self, other: &Self) -> f32 {
-        // Euclidean distance metric
-        ((self.0 - other.0).powi(2) + (self.1 - other.1).powi(2)).sqrt()
+        Element::distance(&self.0, &other.0)
     }
 }

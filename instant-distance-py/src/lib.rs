@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::iter::FromIterator;
 
-use instant_distance::Point;
+use instant_distance::{Element, Point, PointRef};
 use pyo3::conversion::IntoPy;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::types::{PyList, PyModule, PyString};
@@ -29,7 +29,7 @@ fn instant_distance_py(_: Python, m: &PyModule) -> PyResult<()> {
 
 #[pyclass]
 struct HnswMap {
-    inner: instant_distance::HnswMap<FloatArray, MapValue>,
+    inner: instant_distance::HnswMap<f32, FloatArray, MapValue>,
 }
 
 #[pymethods]
@@ -55,7 +55,7 @@ impl HnswMap {
     #[staticmethod]
     fn load(fname: &str) -> PyResult<Self> {
         let hnsw_map =
-            bincode::deserialize_from::<_, instant_distance::HnswMap<FloatArray, MapValue>>(
+            bincode::deserialize_from::<_, instant_distance::HnswMap<f32, FloatArray, MapValue>>(
                 BufReader::with_capacity(32 * 1024 * 1024, File::open(fname)?),
             )
             .map_err(|e| PyValueError::new_err(format!("deserialization error: {e:?}")))?;
@@ -91,7 +91,7 @@ impl HnswMap {
 /// with a squared Euclidean distance metric.
 #[pyclass]
 struct Hnsw {
-    inner: instant_distance::Hnsw<FloatArray>,
+    inner: instant_distance::Hnsw<f32, FloatArray>,
 }
 
 #[pymethods]
@@ -112,7 +112,7 @@ impl Hnsw {
     /// Load an index from the given file name
     #[staticmethod]
     fn load(fname: &str) -> PyResult<Self> {
-        let hnsw = bincode::deserialize_from::<_, instant_distance::Hnsw<FloatArray>>(
+        let hnsw = bincode::deserialize_from::<_, instant_distance::Hnsw<f32, FloatArray>>(
             BufReader::with_capacity(32 * 1024 * 1024, File::open(fname)?),
         )
         .map_err(|e| PyValueError::new_err(format!("deserialization error: {e:?}")))?;
@@ -136,7 +136,12 @@ impl Hnsw {
     /// For best performance, reusing `Search` objects is recommended.
     fn search(slf: Py<Self>, point: &PyAny, search: &mut Search, py: Python<'_>) -> PyResult<()> {
         let point = FloatArray::try_from(point)?;
-        let _ = slf.try_borrow(py)?.inner.search(&point, &mut search.inner);
+        let data = point.as_slice();
+        let point_ref = PointRef(data);
+        let _ = slf
+            .try_borrow(py)?
+            .inner
+            .search(&point_ref, &mut search.inner);
         search.cur = Some((HnswType::Hnsw(slf.clone_ref(py)), 0));
         Ok(())
     }
@@ -366,47 +371,14 @@ impl TryFrom<&PyAny> for FloatArray {
 }
 
 impl Point for FloatArray {
-    fn distance(&self, rhs: &Self) -> f32 {
-        #[cfg(target_arch = "x86_64")]
-        {
-            use std::arch::x86_64::{
-                _mm256_castps256_ps128, _mm256_extractf128_ps, _mm256_fmadd_ps, _mm256_load_ps,
-                _mm256_setzero_ps, _mm256_sub_ps, _mm_add_ps, _mm_add_ss, _mm_cvtss_f32,
-                _mm_fmadd_ps, _mm_load_ps, _mm_movehl_ps, _mm_shuffle_ps, _mm_sub_ps,
-            };
-            debug_assert_eq!(self.0.len() % 8, 4);
+    const STRIDE: usize = DIMENSIONS;
+    type Element = f32;
+    fn as_slice(&self) -> &[Self::Element] {
+        &self.0
+    }
 
-            unsafe {
-                let mut acc_8x = _mm256_setzero_ps();
-                for (lh_slice, rh_slice) in self.0.chunks_exact(8).zip(rhs.0.chunks_exact(8)) {
-                    let lh_8x = _mm256_load_ps(lh_slice.as_ptr());
-                    let rh_8x = _mm256_load_ps(rh_slice.as_ptr());
-                    let diff = _mm256_sub_ps(lh_8x, rh_8x);
-                    acc_8x = _mm256_fmadd_ps(diff, diff, acc_8x);
-                }
-
-                let mut acc_4x = _mm256_extractf128_ps(acc_8x, 1); // upper half
-                let right = _mm256_castps256_ps128(acc_8x); // lower half
-                acc_4x = _mm_add_ps(acc_4x, right); // sum halves
-
-                let lh_4x = _mm_load_ps(self.0[DIMENSIONS - 4..].as_ptr());
-                let rh_4x = _mm_load_ps(rhs.0[DIMENSIONS - 4..].as_ptr());
-                let diff = _mm_sub_ps(lh_4x, rh_4x);
-                acc_4x = _mm_fmadd_ps(diff, diff, acc_4x);
-
-                let lower = _mm_movehl_ps(acc_4x, acc_4x);
-                acc_4x = _mm_add_ps(acc_4x, lower);
-                let upper = _mm_shuffle_ps(acc_4x, acc_4x, 0x1);
-                acc_4x = _mm_add_ss(acc_4x, upper);
-                _mm_cvtss_f32(acc_4x)
-            }
-        }
-        #[cfg(not(target_arch = "x86_64"))]
-        self.0
-            .iter()
-            .zip(rhs.0.iter())
-            .map(|(&a, &b)| (a - b).powi(2))
-            .sum::<f32>()
+    fn distance(&self, other: &Self) -> f32 {
+        Element::distance(&self.0[..], &other.0[..])
     }
 }
 
