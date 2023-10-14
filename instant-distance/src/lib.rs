@@ -16,7 +16,10 @@ use serde::{Deserialize, Serialize};
 
 mod types;
 pub use types::PointId;
-use types::{Candidate, Layer, LayerId, UpperNode, Visited, ZeroNode, INVALID};
+use types::{
+    determine_the_number_and_size_of_layers, shuffle_points_for_layer_assignment, Candidate, Layer,
+    LayerId, UpperNode, Visited, ZeroNode,
+};
 
 #[derive(Clone)]
 /// Parameters for building the `Hnsw`
@@ -233,41 +236,11 @@ where
             );
         }
 
-        // Determine the number and size of layers.
+        let sizes = determine_the_number_and_size_of_layers(ml, &points);
 
-        let mut sizes = Vec::new();
-        let mut num = points.len();
-        loop {
-            let next = (num as f32 * ml) as usize;
-            if next < M {
-                break;
-            }
-            sizes.push((num - next, num));
-            num = next;
-        }
-        sizes.push((num, num));
-        sizes.reverse();
         let top = LayerId(sizes.len() - 1);
 
-        // Give all points a random layer and sort the list of nodes by descending order for
-        // construction. This allows us to copy higher layers to lower layers as construction
-        // progresses, while preserving randomness in each point's layer and insertion order.
-
-        assert!(points.len() < u32::MAX as usize);
-        let mut shuffled = (0..points.len())
-            .map(|i| (PointId(rng.gen_range(0..points.len() as u32)), i))
-            .collect::<Vec<_>>();
-        shuffled.sort_unstable();
-
-        let mut out = vec![INVALID; points.len()];
-        let points = shuffled
-            .into_iter()
-            .enumerate()
-            .map(|(i, (_, idx))| {
-                out[idx] = PointId(i as u32);
-                points[idx].clone()
-            })
-            .collect::<Vec<_>>();
+        let (points, out) = shuffle_points_for_layer_assignment(rng, points);
 
         // Figure out how many nodes will go on each layer. This helps us allocate memory capacity
         // for each layer in advance, and also helps enable batch insertion of points.

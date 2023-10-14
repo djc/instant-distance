@@ -3,6 +3,8 @@ use std::ops::{Deref, Index};
 
 use ordered_float::OrderedFloat;
 use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard};
+use rand::rngs::SmallRng;
+use rand::Rng;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "serde-big-array")]
@@ -14,7 +16,6 @@ pub(crate) struct Visited {
     store: Vec<u8>,
     generation: u8,
 }
-
 impl Visited {
     pub(crate) fn with_capacity(capacity: usize) -> Self {
         Self {
@@ -56,6 +57,51 @@ impl Visited {
         self.store.resize(len, 0);
         self.generation = 1;
     }
+}
+
+/// Determine the number and size of layers.
+pub(crate) fn determine_the_number_and_size_of_layers<P: Point>(
+    ml: f32,
+    points: &[P],
+) -> Vec<(usize, usize)> {
+    let mut sizes = Vec::new();
+    let mut num = points.len();
+    loop {
+        let next = (num as f32 * ml) as usize;
+        if next < M {
+            break;
+        }
+        sizes.push((num - next, num));
+        num = next;
+    }
+    sizes.push((num, num));
+    sizes.reverse();
+    sizes
+}
+
+/// Give all points a random layer and sort the list of nodes by descending order for
+/// construction. This allows us to copy higher layers to lower layers as construction
+/// progresses, while preserving randomness in each point's layer and insertion order.
+pub(crate) fn shuffle_points_for_layer_assignment<P: Point>(
+    mut rng: SmallRng,
+    points: Vec<P>,
+) -> (Vec<P>, Vec<PointId>) {
+    assert!(points.len() < u32::MAX as usize);
+    let mut shuffled = (0..points.len())
+        .map(|i| (PointId(rng.gen_range(0..points.len() as u32)), i))
+        .collect::<Vec<_>>();
+    shuffled.sort_unstable();
+
+    let mut out = vec![INVALID; points.len()];
+    let points = shuffled
+        .into_iter()
+        .enumerate()
+        .map(|(i, (_, idx))| {
+            out[idx] = PointId(i as u32);
+            points[idx].clone()
+        })
+        .collect::<Vec<_>>();
+    (points, out)
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
