@@ -14,6 +14,7 @@ use std::time::{Duration, Instant};
 
 use clap::Parser;
 use instant_distance::{Builder, Search};
+
 use instant_distance_py::FloatArray;
 
 fn main() -> Result<(), anyhow::Error> {
