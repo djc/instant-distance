@@ -1,6 +1,7 @@
-use std::cmp::{max, Ordering, Reverse};
+use std::cmp::{Ordering, Reverse};
 use std::collections::BinaryHeap;
 use std::collections::HashSet;
+use std::ops::Range;
 #[cfg(feature = "indicatif")]
 use std::sync::atomic::{self, AtomicUsize};
 
@@ -8,18 +9,15 @@ use std::sync::atomic::{self, AtomicUsize};
 use indicatif::ProgressBar;
 use ordered_float::OrderedFloat;
 use parking_lot::{Mutex, RwLock};
-use rand::rngs::SmallRng;
-use rand::{Rng, SeedableRng};
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
+mod contiguous;
+use contiguous::shuffle_points_for_layer_assignment;
 mod types;
 pub use types::PointId;
-use types::{
-    determine_the_number_and_size_of_layers, shuffle_points_for_layer_assignment, Candidate, Layer,
-    LayerId, UpperNode, Visited, ZeroNode,
-};
+use types::{Candidate, Layer, LayerId, LayerSliceMut, Meta, Visited, ZeroNode, INVALID};
 
 #[derive(Clone)]
 /// Parameters for building the `Hnsw`
@@ -196,9 +194,9 @@ impl<'a, P, V> MapItem<'a, P, V> {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct Hnsw<P> {
     ef_search: usize,
-    points: Vec<P>,
-    zero: Vec<ZeroNode>,
-    layers: Vec<Vec<UpperNode>>,
+    pub(crate) points: Vec<P>,
+    meta: Meta,
+    neighbors: Vec<PointId>,
 }
 
 impl<P> Hnsw<P>
@@ -209,12 +207,11 @@ where
         Builder::default()
     }
 
-    fn new(points: Vec<P>, builder: Builder) -> (Self, Vec<PointId>) {
+    pub(crate) fn new(points: Vec<P>, builder: Builder) -> (Self, Vec<PointId>) {
         let ef_search = builder.ef_search;
         let ef_construction = builder.ef_construction;
         let ml = builder.ml;
         let heuristic = builder.heuristic;
-        let mut rng = SmallRng::seed_from_u64(builder.seed);
 
         #[cfg(feature = "indicatif")]
         let progress = builder.progress;
@@ -228,43 +225,30 @@ where
             return (
                 Self {
                     ef_search,
-                    zero: Vec::new(),
                     points: Vec::new(),
-                    layers: Vec::new(),
+                    neighbors: Vec::new(),
+                    meta: Meta::default(),
                 },
                 Vec::new(),
             );
         }
 
-        let sizes = determine_the_number_and_size_of_layers(ml, &points);
+        let mut meta = Meta::new(ml, points.len());
 
-        let top = LayerId(sizes.len() - 1);
+        let (points, out, nodes) = shuffle_points_for_layer_assignment(points, &meta, builder);
 
-        let (points, out) = shuffle_points_for_layer_assignment(rng, points);
+        // Insert the first point so that we have an enter point to start searches with.
 
-        // Figure out how many nodes will go on each layer. This helps us allocate memory capacity
-        // for each layer in advance, and also helps enable batch insertion of points.
-
-        let num_layers = sizes.len();
-        let mut ranges = Vec::with_capacity(top.0);
-        for (i, (size, cumulative)) in sizes.into_iter().enumerate() {
-            let start = cumulative - size;
-            // Skip the first point, since we insert the enter point separately
-            ranges.push((LayerId(num_layers - i - 1), max(start, 1)..cumulative));
-        }
-
-        // Initialize data for layers
-
-        let mut layers = vec![vec![]; top.0];
-        let zero = points
-            .iter()
-            .map(|_| RwLock::new(ZeroNode::default()))
-            .collect::<Vec<_>>();
+        let mut neighbors = vec![INVALID; meta.neighbors()];
+        let mut layers = meta.layers_mut(&mut neighbors);
+        let (zero, upper) = layers.split_first_mut().unwrap();
+        let zero = zero.zero_nodes();
 
         let state = Construction {
+            meta: &mut meta,
             zero: zero.as_slice(),
+            upper,
             pool: SearchPool::new(points.len()),
-            top,
             points: &points,
             heuristic,
             ef_construction,
@@ -274,44 +258,35 @@ where
             done: AtomicUsize::new(0),
         };
 
-        for (layer, range) in ranges {
+        for layer in state.meta.descending() {
             #[cfg(feature = "indicatif")]
             if let Some(bar) = &state.progress {
                 bar.set_message(format!("Building index (layer {})", layer.0));
             }
 
-            let inserter = |pid| state.insert(pid, layer, &layers);
+            let Range { start, end } = state.meta.points(layer);
+            nodes[start..end].into_par_iter().for_each(|(_, pid)| {
+                state.insert(*pid, layer);
+            });
 
-            let end = range.end;
-            if layer == top {
-                range.into_iter().for_each(|i| inserter(PointId(i as u32)))
-            } else {
-                range
-                    .into_par_iter()
-                    .for_each(|i| inserter(PointId(i as u32)));
-            }
-
-            // For layers above the zero layer, make a copy of the current state of the zero layer
-            // with `nearest` truncated to `M` elements.
-            if !layer.is_zero() {
-                (&state.zero[..end])
-                    .into_par_iter()
-                    .map(|zero| UpperNode::from_zero(&zero.read()))
-                    .collect_into_vec(&mut layers[layer.0 - 1]);
+            // Copy the current state of the zero layer
+            match layer.0 {
+                0 => break,
+                n => state.upper[n - 1].copy_from_zero(&zero[..end]),
             }
         }
 
         #[cfg(feature = "indicatif")]
-        if let Some(bar) = &state.progress {
+        if let Some(bar) = state.progress {
             bar.finish();
         }
 
         (
             Self {
                 ef_search,
-                zero: zero.into_iter().map(|node| node.into_inner()).collect(),
+                neighbors,
+                meta,
                 points,
-                layers,
             },
             out,
         )
@@ -335,17 +310,15 @@ where
 
         search.visited.reserve_capacity(self.points.len());
         search.push(PointId(0), point, &self.points);
-        for cur in LayerId(self.layers.len()).descend() {
+        for cur in self.meta.descending() {
             let (ef, num) = match cur.is_zero() {
                 true => (self.ef_search, M * 2),
                 false => (1, M),
             };
 
             search.ef = ef;
-            match cur.0 {
-                0 => search.search(point, self.zero.as_slice(), &self.points, num),
-                l => search.search(point, self.layers[l - 1].as_slice(), &self.points, num),
-            }
+            let layer = self.meta.layer(cur, &self.neighbors);
+            search.search(point, layer, &self.points, num);
 
             if !cur.is_zero() {
                 search.cull();
@@ -385,10 +358,11 @@ impl<'a, P> Item<'a, P> {
     }
 }
 
-struct Construction<'a, P: Point> {
-    zero: &'a [RwLock<ZeroNode>],
+struct Construction<'a, P> {
+    meta: &'a Meta,
+    zero: &'a [RwLock<ZeroNode<'a>>],
+    upper: &'a mut [LayerSliceMut<'a>],
     pool: SearchPool,
-    top: LayerId,
     points: &'a [P],
     heuristic: Option<Heuristic>,
     ef_construction: usize,
@@ -407,7 +381,7 @@ impl<'a, P: Point> Construction<'a, P> {
     ///
     /// Creates the new node, initializing its `nearest` array and updates the nearest neighbors
     /// for the new node's neighbors if necessary before appending the new node to the layer.
-    fn insert(&self, new: PointId, layer: LayerId, layers: &[Vec<UpperNode>]) {
+    fn insert(&self, new: PointId, layer: LayerId) {
         let mut node = self.zero[new].write();
         let (mut search, mut insertion) = self.pool.pop();
         insertion.ef = self.ef_construction;
@@ -417,7 +391,7 @@ impl<'a, P: Point> Construction<'a, P> {
         search.push(PointId(0), point, self.points);
         let num = if layer.is_zero() { M * 2 } else { M };
 
-        for cur in self.top.descend() {
+        for cur in self.meta.descending() {
             search.ef = if cur <= layer {
                 self.ef_construction
             } else {
@@ -425,7 +399,7 @@ impl<'a, P: Point> Construction<'a, P> {
             };
             match cur > layer {
                 true => {
-                    search.search(point, layers[cur.0 - 1].as_slice(), self.points, num);
+                    search.search(point, self.upper[cur.0 - 1].as_ref(), self.points, num);
                     search.cull();
                 }
                 false => {
