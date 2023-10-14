@@ -429,18 +429,21 @@ impl<'a, P: Point> Construction<'a, P> {
             // `candidate` here is the new node's neighbor
             let &Candidate { distance, pid } = candidate;
             if let Some(heuristic) = self.heuristic {
+                let mut candidate_write_lock = self.zero[pid].write();
+                let current = candidate_write_lock
+                    .iter()
+                    .take_while(|p| p.is_valid())
+                    .copied();
                 let found = insertion.add_neighbor_heuristic(
                     new,
-                    self.zero.nearest_iter(pid),
+                    current,
                     self.zero,
                     &self.points[pid],
                     self.points,
                     heuristic,
                 );
 
-                self.zero[pid]
-                    .write()
-                    .rewrite(found.iter().map(|candidate| candidate.pid));
+                candidate_write_lock.rewrite(found.iter().map(|candidate| candidate.pid))
             } else {
                 // Find the correct index to insert at to keep the neighbor's neighbors sorted
                 let old = &self.points[pid];
