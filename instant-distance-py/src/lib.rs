@@ -353,7 +353,7 @@ impl Neighbor {
 
 #[repr(align(32))]
 #[derive(Clone, Deserialize, Serialize)]
-struct FloatArray(#[serde(with = "BigArray")] [f32; DIMENSIONS]);
+pub struct FloatArray(#[serde(with = "BigArray")] pub [f32; DIMENSIONS]);
 
 impl TryFrom<&PyAny> for FloatArray {
     type Error = PyErr;
@@ -373,6 +373,7 @@ impl TryFrom<&PyAny> for FloatArray {
 impl Point for FloatArray {
     const STRIDE: usize = DIMENSIONS;
     type Element = f32;
+
     fn as_slice(&self) -> &[Self::Element] {
         &self.0
     }
