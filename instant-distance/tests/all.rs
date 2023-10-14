@@ -7,6 +7,46 @@ use rand::{Rng, SeedableRng};
 use instant_distance::{Builder, Point as _, Search};
 
 #[test]
+fn neighbors_regression() {
+    for _ in 0..10 {
+        let points = (0..5)
+            .map(|i| Point(i as f32, i as f32))
+            .collect::<Vec<_>>();
+        let values = vec!["zero", "one", "two", "three", "four"];
+
+        let seed = 12345689;
+        println!("\nmap (seed = {seed})");
+        let map = Builder::default().seed(seed).build(points, values);
+
+        let values = map
+            .values
+            .iter()
+            .enumerate()
+            .map(|(i, v)| (i, v))
+            .collect::<Vec<_>>();
+
+        println!("values reordered {:?}", values);
+
+        let mut search = Search::default();
+
+        let search_results = map
+            .search(&Point(2.0, 2.0), &mut search)
+            .map(|item| (item.distance, item.value))
+            .collect::<Vec<_>>();
+
+        println!("search results {:?}", search_results);
+
+        assert_eq!(*search_results[0].1, "two");
+        assert_eq!(*search_results[1].1, "one");
+        assert_eq!(*search_results[2].1, "three");
+        assert_eq!(*search_results[3].1, "four");
+        assert_eq!(*search_results[4].1, "zero");
+
+        assert_eq!(search_results.len(), 5);
+    }
+}
+
+#[test]
 #[allow(clippy::float_cmp, clippy::approx_constant)]
 fn map() {
     let points = (0..5)
