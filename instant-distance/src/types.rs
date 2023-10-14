@@ -9,7 +9,7 @@ use rayon::slice::ParallelSliceMut;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::{Hnsw, Point, M};
+use crate::M;
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Debug, Default)]
@@ -219,7 +219,7 @@ impl<'a> LayerSliceMut<'a> {
             .par_chunks_mut(stride)
             .zip(zero)
             .for_each(|(dst, src)| {
-                dst.copy_from_slice(&src.read()[..stride]);
+                dst.copy_from_slice(&src.read().0[..stride]);
             });
     }
 
@@ -326,7 +326,7 @@ impl Iterator for DescendingLayerIter {
 }
 
 /// A potential nearest neighbor
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Candidate {
     pub(crate) distance: OrderedFloat<f32>,
     /// The identifier for the neighboring point
@@ -363,22 +363,6 @@ impl From<u32> for PointId {
 impl Default for PointId {
     fn default() -> Self {
         INVALID
-    }
-}
-
-impl<P> Index<PointId> for Hnsw<P> {
-    type Output = P;
-
-    fn index(&self, index: PointId) -> &Self::Output {
-        &self.points[index.0 as usize]
-    }
-}
-
-impl<P: Point> Index<PointId> for [P] {
-    type Output = P;
-
-    fn index(&self, index: PointId) -> &Self::Output {
-        &self[index.0 as usize]
     }
 }
 
