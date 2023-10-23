@@ -4,7 +4,24 @@ use ordered_float::OrderedFloat;
 use rand::rngs::{StdRng, ThreadRng};
 use rand::{Rng, SeedableRng};
 
-use instant_distance::{Builder, Point as _, Search};
+use instant_distance::{Builder, Heuristic, Point as _, Search};
+
+#[test]
+fn extend_candidates() {
+    let seed = ThreadRng::default().gen::<u64>();
+    println!("extend_candidates (seed = {seed})");
+    let mut rng = StdRng::seed_from_u64(seed);
+    let points = (0..1024)
+        .map(|_| Point(rng.gen(), rng.gen()))
+        .collect::<Vec<_>>();
+    Builder::default()
+        .select_heuristic(Some(Heuristic {
+            extend_candidates: true,
+            ..Default::default()
+        }))
+        .seed(seed)
+        .build_hnsw(points);
+}
 
 #[test]
 #[allow(clippy::float_cmp, clippy::approx_constant)]

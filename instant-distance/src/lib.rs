@@ -435,7 +435,6 @@ impl<'a, P: Point> Construction<'a, P> {
     /// Creates the new node, initializing its `nearest` array and updates the nearest neighbors
     /// for the new node's neighbors if necessary before appending the new node to the layer.
     fn insert(&self, new: PointId, layer: LayerId, layers: &[Vec<UpperNode>]) {
-        let mut node = self.zero[new].write();
         let (mut search, mut insertion) = self.pool.pop();
         insertion.ef = self.ef_construction;
 
@@ -513,7 +512,7 @@ impl<'a, P: Point> Construction<'a, P> {
 
                 self.zero[pid].write().insert(idx, new);
             }
-            node.set(i, pid);
+            self.zero[new].write().set(i, pid);
         }
 
         #[cfg(feature = "indicatif")]
