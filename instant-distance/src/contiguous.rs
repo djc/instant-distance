@@ -10,7 +10,6 @@ use crate::{Builder, Element, Point, PointId};
 pub struct PointIter<'a, E, P: Point<Element = E>> {
     values: &'a [P::Element],
     index: usize,
-    _marker: PhantomData<&'a P>,
 }
 
 impl<'a, E, P: Point<Element = E>> Iterator for PointIter<'a, E, P> {
@@ -31,7 +30,6 @@ pub trait Storage<E, P: Point<Element = E>> {
     fn is_empty(&self) -> bool;
 }
 
-// TODO: remove default N
 pub struct PointRef<'a, E, P: Point<Element = E>>(pub &'a [P::Element]);
 
 impl<'a, E, P: Point<Element = E>> PointRef<'a, E, P> {
@@ -109,7 +107,6 @@ impl<'a, E: Element + 'a, P: Point<Element = E>> Storage<E, P> for ContiguousSto
         PointIter {
             values: &self.values,
             index: 0,
-            _marker: PhantomData,
         }
     }
 

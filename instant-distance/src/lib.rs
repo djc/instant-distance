@@ -1,7 +1,6 @@
 use std::cmp::{Ordering, Reverse};
 use std::collections::BinaryHeap;
 use std::collections::HashSet;
-use std::marker::PhantomData;
 use std::ops::Range;
 #[cfg(feature = "indicatif")]
 use std::sync::atomic::{self, AtomicUsize};
@@ -16,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 mod contiguous;
 use contiguous::ContiguousStorage;
-mod simd;
+pub mod simd;
 pub use contiguous::{PointRef, Storage};
 mod types;
 use simd::{distance_simd_f32, distance_simd_f64};
@@ -195,7 +194,6 @@ pub struct MapItem<'a, E, P: Point<Element = E>, V> {
     pub pid: PointId,
     pub point: PointRef<'a, E, P>,
     pub value: &'a V,
-    _marker: PhantomData<&'a P>,
 }
 
 impl<'a, E: Element, P: Point<Element = E>, V> MapItem<'a, E, P, V> {
@@ -205,7 +203,6 @@ impl<'a, E: Element, P: Point<Element = E>, V> MapItem<'a, E, P, V> {
             pid: item.pid,
             point: item.point,
             value: &map.values[item.pid.0 as usize],
-            _marker: PhantomData,
         }
     }
 }
