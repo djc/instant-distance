@@ -1,4 +1,4 @@
-![Cover logo](./cover.svg)
+![Cover logo](./cover.png)
 
 # Instant Distance: fast HNSW indexing
 
