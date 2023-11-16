@@ -4,7 +4,7 @@ use ordered_float::OrderedFloat;
 use rand::rngs::{StdRng, ThreadRng};
 use rand::{Rng, SeedableRng};
 
-use instant_distance::{Builder, Point as _, Search};
+use instant_distance::{Builder, Metric, Search};
 
 #[test]
 #[allow(clippy::float_cmp, clippy::approx_constant)]
@@ -16,7 +16,9 @@ fn map() {
 
     let seed = ThreadRng::default().gen::<u64>();
     println!("map (seed = {seed})");
-    let map = Builder::default().seed(seed).build(points, values);
+    let map = Builder::default()
+        .seed(seed)
+        .build::<Point, Point, EuclidMetric, &str, Vec<Point>>(points, values);
     let mut search = Search::default();
 
     for (i, item) in map.search(&Point(2.0, 2.0), &mut search).enumerate() {
@@ -62,14 +64,16 @@ fn randomized(builder: Builder) -> (u64, usize) {
     let query = Point(rng.gen(), rng.gen());
     let mut nearest = Vec::with_capacity(256);
     for (i, p) in points.iter().enumerate() {
-        nearest.push((OrderedFloat::from(query.distance(p)), i));
+        nearest.push((OrderedFloat::from(EuclidMetric::distance(&query, p)), i));
         if nearest.len() >= 200 {
             nearest.sort_unstable();
             nearest.truncate(100);
         }
     }
 
-    let (hnsw, pids) = builder.seed(seed).build_hnsw(points);
+    let (hnsw, pids) = builder
+        .seed(seed)
+        .build_hnsw::<_, _, EuclidMetric, Vec<Point>>(points);
     let mut search = Search::default();
     let results = hnsw.search(&query, &mut search);
     assert!(results.len() >= 100);
@@ -90,9 +94,11 @@ fn randomized(builder: Builder) -> (u64, usize) {
 #[derive(Clone, Copy, Debug)]
 struct Point(f32, f32);
 
-impl instant_distance::Point for Point {
-    fn distance(&self, other: &Self) -> f32 {
+struct EuclidMetric;
+
+impl Metric<Point> for EuclidMetric {
+    fn distance(a: &Point, b: &Point) -> f32 {
         // Euclidean distance metric
-        ((self.0 - other.0).powi(2) + (self.1 - other.1).powi(2)).sqrt()
+        ((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt()
     }
 }
