@@ -1,5 +1,6 @@
-// borrow_deref_ref doesn't get macro detection right, allow for now
-#![allow(clippy::from_iter_instead_of_collect, clippy::borrow_deref_ref)]
+// unnecessary_fallible_converions doesn't get macro detection right, allow for now
+// https://github.com/rust-lang/rust-clippy/issues/12039
+#![allow(clippy::unnecessary_fallible_conversions)]
 
 use std::convert::TryFrom;
 use std::fs::File;
