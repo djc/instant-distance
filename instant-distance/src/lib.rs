@@ -155,7 +155,7 @@ where
         &'a self,
         point: &P,
         search: &'a mut Search,
-    ) -> impl Iterator<Item = MapItem<'a, P, V>> + ExactSizeIterator + 'a {
+    ) -> impl ExactSizeIterator<Item = MapItem<'a, P, V>> + 'a {
         self.hnsw
             .search(point, search)
             .map(move |item| MapItem::from(item, self))
@@ -353,7 +353,7 @@ where
         &'b self,
         point: &P,
         search: &'a mut Search,
-    ) -> impl Iterator<Item = Item<'b, P>> + ExactSizeIterator + 'a {
+    ) -> impl ExactSizeIterator<Item = Item<'b, P>> + 'a {
         search.reset();
         let map = move |candidate| Item::new(candidate, self);
         if self.points.is_empty() {
@@ -759,7 +759,7 @@ impl Search {
         &self.nearest
     }
 
-    fn iter(&self) -> impl Iterator<Item = Candidate> + ExactSizeIterator + '_ {
+    fn iter(&self) -> impl ExactSizeIterator<Item = Candidate> + '_ {
         self.nearest.iter().copied()
     }
 }
