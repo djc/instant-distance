@@ -9,7 +9,7 @@
 Instance Distance is a fast pure-Rust implementation of the [Hierarchical
 Navigable Small Worlds paper][paper] by Malkov and Yashunin for finding
 approximate nearest neighbors. This implementation powers the
-[InstantDomainSearch.com][ids] backend services used for word vector indexing.
+[Instant Domains](https://instantdomains.com) backend services used for word vector indexing.
 
 ## What it does
 
