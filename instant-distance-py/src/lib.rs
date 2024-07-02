@@ -10,7 +10,7 @@ use std::iter::FromIterator;
 use instant_distance::Point;
 use pyo3::conversion::IntoPy;
 use pyo3::exceptions::{PyTypeError, PyValueError};
-use pyo3::types::{PyAnyMethods, PyList, PyListMethods, PyModule, PyString};
+use pyo3::types::{PyAnyMethods, PyList, PyListMethods, PyModule, PyModuleMethods, PyString};
 use pyo3::{pyclass, pymethods, pymodule, Bound};
 use pyo3::{Py, PyAny, PyErr, PyObject, PyRef, PyRefMut, PyResult, Python};
 use serde::{Deserialize, Serialize};
