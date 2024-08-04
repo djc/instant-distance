@@ -72,5 +72,5 @@ make test-python
 ```
 
 [paper]: https://arxiv.org/abs/1603.09320
-[domains]: https://instantdomains.com/search
+[domains]: https://instantdomainsearch.com/
 [translations]: https://instantdomains.com/engineering/how-to-use-fasttext-for-instant-translations
