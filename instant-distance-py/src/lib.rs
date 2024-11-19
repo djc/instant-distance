@@ -2,16 +2,15 @@
 // https://github.com/rust-lang/rust-clippy/issues/12039
 #![allow(clippy::unnecessary_fallible_conversions)]
 
-use std::convert::TryFrom;
+use std::convert::{Infallible, TryFrom};
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::iter::FromIterator;
 
 use instant_distance::Point;
-use pyo3::conversion::IntoPy;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::types::{PyAnyMethods, PyList, PyListMethods, PyModule, PyModuleMethods, PyString};
-use pyo3::{pyclass, pymethods, pymodule, Bound};
+use pyo3::{pyclass, pymethods, pymodule, Bound, IntoPyObject};
 use pyo3::{Py, PyAny, PyErr, PyObject, PyRef, PyRefMut, PyResult, Python};
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
@@ -203,7 +202,7 @@ impl Search {
                 item.map(|item| Neighbor {
                     distance: item.distance,
                     pid: item.pid.into_inner(),
-                    value: item.value.into_py(py),
+                    value: item.value.into_pyobject(py).unwrap().unbind(), // Infallible conversion
                 })
             }
         };
@@ -370,7 +369,7 @@ impl TryFrom<&Bound<'_, PyAny>> for FloatArray {
 
     fn try_from(value: &Bound<'_, PyAny>) -> Result<Self, Self::Error> {
         let mut new = FloatArray([0.0; DIMENSIONS]);
-        for (i, val) in value.iter()?.enumerate() {
+        for (i, val) in value.try_iter()?.enumerate() {
             match i >= DIMENSIONS {
                 true => return Err(PyTypeError::new_err("point array too long")),
                 false => new.0[i] = val?.extract::<f32>()?,
@@ -438,10 +437,14 @@ impl TryFrom<Bound<'_, PyAny>> for MapValue {
     }
 }
 
-impl IntoPy<Py<PyAny>> for &'_ MapValue {
-    fn into_py(self, py: Python<'_>) -> Py<PyAny> {
+impl<'py> IntoPyObject<'py> for &'_ MapValue {
+    type Target = PyAny;
+    type Output = Bound<'py, Self::Target>;
+    type Error = Infallible;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
         match self {
-            MapValue::String(s) => PyString::new_bound(py, s).into(),
+            MapValue::String(s) => Ok(PyString::new(py, s).into_any()),
         }
     }
 }
