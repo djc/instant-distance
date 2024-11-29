@@ -425,7 +425,7 @@ struct Construction<'a, P: Point> {
     done: AtomicUsize,
 }
 
-impl<'a, P: Point> Construction<'a, P> {
+impl<P: Point> Construction<'_, P> {
     /// Insert new node in the zero layer
     ///
     /// * `new` is the `PointId` for the new node
