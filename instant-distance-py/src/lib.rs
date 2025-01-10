@@ -180,11 +180,7 @@ impl Search {
 
     /// Return the next closest point
     fn __next__(mut slf: PyRefMut<Self>) -> Option<Neighbor> {
-        let (index, idx) = match slf.cur.take() {
-            Some(x) => x,
-            None => return None,
-        };
-
+        let (index, idx) = slf.cur.take()?;
         let py = slf.py();
         let neighbor = match &index {
             HnswType::Hnsw(hnsw) => {
