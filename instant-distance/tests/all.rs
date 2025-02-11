@@ -14,7 +14,7 @@ fn map() {
         .collect::<Vec<_>>();
     let values = vec!["zero", "one", "two", "three", "four"];
 
-    let seed = ThreadRng::default().gen::<u64>();
+    let seed = ThreadRng::default().random();
     println!("map (seed = {seed})");
     let map = Builder::default().seed(seed).build(points, values);
     let mut search = Search::default();
@@ -53,13 +53,13 @@ fn random_simple() {
 }
 
 fn randomized(builder: Builder) -> (u64, usize) {
-    let seed = ThreadRng::default().gen::<u64>();
+    let seed = ThreadRng::default().random();
     let mut rng = StdRng::seed_from_u64(seed);
     let points = (0..1024)
-        .map(|_| Point(rng.gen(), rng.gen()))
+        .map(|_| Point(rng.random(), rng.random()))
         .collect::<Vec<_>>();
 
-    let query = Point(rng.gen(), rng.gen());
+    let query = Point(rng.random(), rng.random());
     let mut nearest = Vec::with_capacity(256);
     for (i, p) in points.iter().enumerate() {
         nearest.push((OrderedFloat::from(query.distance(p)), i));
