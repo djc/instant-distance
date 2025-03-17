@@ -15,7 +15,7 @@ name = "instant_distance"
 crate-type = ["cdylib"]
 
 [dependencies]
-bincode = "1.3.1"
+bincode = "2.0.1"
 instant-distance = { version = "0.6", path = "../instant-distance", features = ["with-serde"] }
 pyo3 = { version = "0.24", features = ["extension-module"] }
 serde = { version = "1", features = ["derive"] }
