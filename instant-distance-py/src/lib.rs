@@ -11,7 +11,7 @@ use instant_distance::Point;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::types::{PyAnyMethods, PyList, PyListMethods, PyModule, PyModuleMethods, PyString};
 use pyo3::{pyclass, pymethods, pymodule, Bound, IntoPyObject};
-use pyo3::{Py, PyAny, PyErr, PyObject, PyRef, PyRefMut, PyResult, Python};
+use pyo3::{Py, PyAny, PyErr, PyRef, PyRefMut, PyResult, Python};
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 
@@ -335,18 +335,18 @@ struct Neighbor {
     pid: u32,
     /// Value for the neighboring point (only set for `HnswMap` results)
     #[pyo3(get)]
-    value: PyObject,
+    value: Py<PyAny>,
 }
 
 #[pymethods]
 impl Neighbor {
     fn __repr__(&self) -> PyResult<String> {
-        match Python::with_gil(|py| self.value.is_none(py)) {
+        match Python::attach(|py| self.value.is_none(py)) {
             false => Ok(format!(
                 "instant_distance.Neighbor(distance={}, pid={}, value={})",
                 self.distance,
                 self.pid,
-                Python::with_gil(|py| self.value.bind(py).repr().map(|s| s.to_string()))?,
+                Python::attach(|py| self.value.bind(py).repr().map(|s| s.to_string()))?,
             )),
             true => Ok(format!(
                 "instant_distance.Item(distance={}, pid={})",
