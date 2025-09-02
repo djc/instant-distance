@@ -76,6 +76,15 @@ jobs:
           command: clippy
           args: --workspace --all-targets --all-features -- -D warnings
 
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.80.0
+      - run: cargo c --lib --all-features
+
   audit:
     runs-on: ubuntu-latest
     steps:
