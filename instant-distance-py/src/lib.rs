@@ -10,7 +10,7 @@ use std::iter::FromIterator;
 use instant_distance::Point;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::types::{PyAnyMethods, PyList, PyListMethods, PyModule, PyModuleMethods, PyString};
-use pyo3::{pyclass, pymethods, pymodule, Bound, IntoPyObject};
+use pyo3::{pyclass, pymethods, pymodule, Bound, FromPyObject, IntoPyObject};
 use pyo3::{Py, PyAny, PyErr, PyRef, PyRefMut, PyResult, Python};
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
@@ -213,7 +213,7 @@ enum HnswType {
     Map(Py<HnswMap>),
 }
 
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 #[derive(Copy, Clone, Default)]
 struct Config {
     /// Number of nearest neighbors to cache during the search
@@ -273,8 +273,8 @@ impl From<&Config> for instant_distance::Builder {
     }
 }
 
-#[pyclass]
-#[derive(Copy, Clone)]
+#[pyclass(skip_from_py_object)]
+#[derive(Copy, Clone, FromPyObject)]
 struct Heuristic {
     /// Whether to extend the candidate set before selecting results
     ///
