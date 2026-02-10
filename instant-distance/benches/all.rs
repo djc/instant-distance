@@ -1,6 +1,6 @@
 use bencher::{benchmark_group, benchmark_main, Bencher};
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 use instant_distance::Builder;
 

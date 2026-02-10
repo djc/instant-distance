@@ -9,7 +9,7 @@ use indicatif::ProgressBar;
 use ordered_float::OrderedFloat;
 use parking_lot::{Mutex, RwLock};
 use rand::rngs::SmallRng;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
