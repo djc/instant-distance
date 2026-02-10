@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use ordered_float::OrderedFloat;
 use rand::rngs::{StdRng, ThreadRng};
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 use instant_distance::{Builder, Point as _, Search};
 
