@@ -142,7 +142,7 @@ where
         let (hnsw, ids) = Hnsw::new(points, builder);
 
         let mut sorted = ids.into_iter().enumerate().collect::<Vec<_>>();
-        sorted.sort_unstable_by(|a, b| a.1.cmp(&b.1));
+        sorted.sort_unstable_by_key(|id| id.1);
         let new = sorted
             .into_iter()
             .map(|(src, _)| values[src].clone())
