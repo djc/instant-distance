@@ -1,23 +1,23 @@
-// borrow_deref_ref doesn't get macro detection right, allow for now
-#![allow(clippy::from_iter_instead_of_collect, clippy::borrow_deref_ref)]
+// unnecessary_fallible_converions doesn't get macro detection right, allow for now
+// https://github.com/rust-lang/rust-clippy/issues/12039
+#![allow(clippy::unnecessary_fallible_conversions)]
 
-use std::convert::TryFrom;
+use std::convert::{Infallible, TryFrom};
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::iter::FromIterator;
 
 use instant_distance::Point;
-use pyo3::conversion::IntoPy;
 use pyo3::exceptions::{PyTypeError, PyValueError};
-use pyo3::types::{PyList, PyModule, PyString};
-use pyo3::{pyclass, pymethods, pymodule};
-use pyo3::{Py, PyAny, PyErr, PyObject, PyRef, PyRefMut, PyResult, Python};
+use pyo3::types::{PyAnyMethods, PyList, PyListMethods, PyModule, PyModuleMethods, PyString};
+use pyo3::{pyclass, pymethods, pymodule, Bound, FromPyObject, IntoPyObject};
+use pyo3::{Py, PyAny, PyErr, PyRef, PyRefMut, PyResult, Python};
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 
 #[pymodule]
 #[pyo3(name = "instant_distance")]
-fn instant_distance_py(_: Python, m: &PyModule) -> PyResult<()> {
+fn instant_distance_py(_: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Neighbor>()?;
     m.add_class::<Heuristic>()?;
     m.add_class::<Config>()?;
@@ -36,10 +36,14 @@ struct HnswMap {
 impl HnswMap {
     /// Build the index
     #[staticmethod]
-    fn build(points: &PyList, values: &PyList, config: &Config) -> PyResult<Self> {
+    fn build(
+        points: &Bound<'_, PyList>,
+        values: &Bound<'_, PyList>,
+        config: &Config,
+    ) -> PyResult<Self> {
         let points = points
-            .into_iter()
-            .map(FloatArray::try_from)
+            .iter()
+            .map(|array| FloatArray::try_from(&array))
             .collect::<Result<Vec<_>, PyErr>>()?;
 
         let values = values
@@ -77,7 +81,12 @@ impl HnswMap {
     /// to the `ef_search` parameter set in the index's `config`.
     ///
     /// For best performance, reusing `Search` objects is recommended.
-    fn search(slf: Py<Self>, point: &PyAny, search: &mut Search, py: Python<'_>) -> PyResult<()> {
+    fn search(
+        slf: Py<Self>,
+        point: &Bound<'_, PyAny>,
+        search: &mut Search,
+        py: Python<'_>,
+    ) -> PyResult<()> {
         let point = FloatArray::try_from(point)?;
         let _ = slf.try_borrow(py)?.inner.search(&point, &mut search.inner);
         search.cur = Some((HnswType::Map(slf.clone_ref(py)), 0));
@@ -98,10 +107,10 @@ struct Hnsw {
 impl Hnsw {
     /// Build the index
     #[staticmethod]
-    fn build(input: &PyList, config: &Config) -> PyResult<(Self, Vec<u32>)> {
+    fn build(input: &Bound<'_, PyList>, config: &Config) -> PyResult<(Self, Vec<u32>)> {
         let points = input
-            .into_iter()
-            .map(FloatArray::try_from)
+            .iter()
+            .map(|array| FloatArray::try_from(&array))
             .collect::<Result<Vec<_>, PyErr>>()?;
 
         let (inner, ids) = instant_distance::Builder::from(config).build_hnsw(points);
@@ -134,7 +143,12 @@ impl Hnsw {
     /// to the `ef_search` parameter set in the index's `config`.
     ///
     /// For best performance, reusing `Search` objects is recommended.
-    fn search(slf: Py<Self>, point: &PyAny, search: &mut Search, py: Python<'_>) -> PyResult<()> {
+    fn search(
+        slf: Py<Self>,
+        point: &Bound<'_, PyAny>,
+        search: &mut Search,
+        py: Python<'_>,
+    ) -> PyResult<()> {
         let point = FloatArray::try_from(point)?;
         let _ = slf.try_borrow(py)?.inner.search(&point, &mut search.inner);
         search.cur = Some((HnswType::Hnsw(slf.clone_ref(py)), 0));
@@ -166,15 +180,11 @@ impl Search {
 
     /// Return the next closest point
     fn __next__(mut slf: PyRefMut<Self>) -> Option<Neighbor> {
-        let (index, idx) = match slf.cur.take() {
-            Some(x) => x,
-            None => return None,
-        };
-
+        let (index, idx) = slf.cur.take()?;
         let py = slf.py();
         let neighbor = match &index {
             HnswType::Hnsw(hnsw) => {
-                let hnsw = hnsw.as_ref(py).borrow();
+                let hnsw = hnsw.bind(py).borrow();
                 let item = hnsw.inner.get(idx, &slf.inner);
                 item.map(|item| Neighbor {
                     distance: item.distance,
@@ -183,12 +193,12 @@ impl Search {
                 })
             }
             HnswType::Map(map) => {
-                let map = map.as_ref(py).borrow();
+                let map = map.bind(py).borrow();
                 let item = map.inner.get(idx, &slf.inner);
                 item.map(|item| Neighbor {
                     distance: item.distance,
                     pid: item.pid.into_inner(),
-                    value: item.value.into_py(py),
+                    value: item.value.into_pyobject(py).unwrap().unbind(), // Infallible conversion
                 })
             }
         };
@@ -203,7 +213,7 @@ enum HnswType {
     Map(Py<HnswMap>),
 }
 
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 #[derive(Copy, Clone, Default)]
 struct Config {
     /// Number of nearest neighbors to cache during the search
@@ -263,8 +273,8 @@ impl From<&Config> for instant_distance::Builder {
     }
 }
 
-#[pyclass]
-#[derive(Copy, Clone)]
+#[pyclass(skip_from_py_object)]
+#[derive(Copy, Clone, FromPyObject)]
 struct Heuristic {
     /// Whether to extend the candidate set before selecting results
     ///
@@ -325,18 +335,18 @@ struct Neighbor {
     pid: u32,
     /// Value for the neighboring point (only set for `HnswMap` results)
     #[pyo3(get)]
-    value: PyObject,
+    value: Py<PyAny>,
 }
 
 #[pymethods]
 impl Neighbor {
     fn __repr__(&self) -> PyResult<String> {
-        match Python::with_gil(|py| self.value.is_none(py)) {
+        match Python::attach(|py| self.value.is_none(py)) {
             false => Ok(format!(
                 "instant_distance.Neighbor(distance={}, pid={}, value={})",
                 self.distance,
                 self.pid,
-                Python::with_gil(|py| self.value.as_ref(py).repr().map(|s| s.to_string()))?,
+                Python::attach(|py| self.value.bind(py).repr().map(|s| s.to_string()))?,
             )),
             true => Ok(format!(
                 "instant_distance.Item(distance={}, pid={})",
@@ -350,12 +360,12 @@ impl Neighbor {
 #[derive(Clone, Deserialize, Serialize)]
 struct FloatArray(#[serde(with = "BigArray")] [f32; DIMENSIONS]);
 
-impl TryFrom<&PyAny> for FloatArray {
+impl TryFrom<&Bound<'_, PyAny>> for FloatArray {
     type Error = PyErr;
 
-    fn try_from(value: &PyAny) -> Result<Self, Self::Error> {
+    fn try_from(value: &Bound<'_, PyAny>) -> Result<Self, Self::Error> {
         let mut new = FloatArray([0.0; DIMENSIONS]);
-        for (i, val) in value.iter()?.enumerate() {
+        for (i, val) in value.try_iter()?.enumerate() {
             match i >= DIMENSIONS {
                 true => return Err(PyTypeError::new_err("point array too long")),
                 false => new.0[i] = val?.extract::<f32>()?,
@@ -415,18 +425,22 @@ enum MapValue {
     String(String),
 }
 
-impl TryFrom<&PyAny> for MapValue {
+impl TryFrom<Bound<'_, PyAny>> for MapValue {
     type Error = PyErr;
 
-    fn try_from(value: &PyAny) -> Result<Self, Self::Error> {
+    fn try_from(value: Bound<'_, PyAny>) -> Result<Self, Self::Error> {
         Ok(MapValue::String(value.extract::<String>()?))
     }
 }
 
-impl IntoPy<Py<PyAny>> for &'_ MapValue {
-    fn into_py(self, py: Python<'_>) -> Py<PyAny> {
+impl<'py> IntoPyObject<'py> for &'_ MapValue {
+    type Target = PyAny;
+    type Output = Bound<'py, Self::Target>;
+    type Error = Infallible;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
         match self {
-            MapValue::String(s) => PyString::new(py, s).into(),
+            MapValue::String(s) => Ok(PyString::new(py, s).into_any()),
         }
     }
 }

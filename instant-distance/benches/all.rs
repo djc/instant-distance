@@ -1,6 +1,6 @@
 use bencher::{benchmark_group, benchmark_main, Bencher};
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 use instant_distance::Builder;
 
@@ -10,7 +10,7 @@ benchmark_group!(benches, build_heuristic);
 fn build_heuristic(bench: &mut Bencher) {
     let mut rng = StdRng::seed_from_u64(SEED);
     let points = (0..1024)
-        .map(|_| Point(rng.gen(), rng.gen()))
+        .map(|_| Point(rng.random(), rng.random()))
         .collect::<Vec<_>>();
 
     bench.iter(|| Builder::default().seed(SEED).build_hnsw(points.clone()))

@@ -9,7 +9,7 @@ use indicatif::ProgressBar;
 use ordered_float::OrderedFloat;
 use parking_lot::{Mutex, RwLock};
 use rand::rngs::SmallRng;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -142,7 +142,7 @@ where
         let (hnsw, ids) = Hnsw::new(points, builder);
 
         let mut sorted = ids.into_iter().enumerate().collect::<Vec<_>>();
-        sorted.sort_unstable_by(|a, b| a.1.cmp(&b.1));
+        sorted.sort_unstable_by_key(|id| id.1);
         let new = sorted
             .into_iter()
             .map(|(src, _)| values[src].clone())
@@ -155,7 +155,7 @@ where
         &'a self,
         point: &P,
         search: &'a mut Search,
-    ) -> impl Iterator<Item = MapItem<'a, P, V>> + ExactSizeIterator + 'a {
+    ) -> impl ExactSizeIterator<Item = MapItem<'a, P, V>> + 'a {
         self.hnsw
             .search(point, search)
             .map(move |item| MapItem::from(item, self))
@@ -261,7 +261,7 @@ where
 
         assert!(points.len() < u32::MAX as usize);
         let mut shuffled = (0..points.len())
-            .map(|i| (PointId(rng.gen_range(0..points.len() as u32)), i))
+            .map(|i| (PointId(rng.random_range(0..points.len() as u32)), i))
             .collect::<Vec<_>>();
         shuffled.sort_unstable();
 
@@ -359,7 +359,7 @@ where
         &'b self,
         point: &P,
         search: &'a mut Search,
-    ) -> impl Iterator<Item = Item<'b, P>> + ExactSizeIterator + 'a {
+    ) -> impl ExactSizeIterator<Item = Item<'b, P>> + 'a {
         search.reset();
         let map = move |candidate| Item::new(candidate, self);
         if self.points.is_empty() {
@@ -480,7 +480,7 @@ struct Construction<'a, P: Point> {
     done: AtomicUsize,
 }
 
-impl<'a, P: Point> Construction<'a, P> {
+impl<P: Point> Construction<'_, P> {
     /// Insert new node in the zero layer
     ///
     /// * `new` is the `PointId` for the new node
@@ -814,7 +814,7 @@ impl Search {
         &self.nearest
     }
 
-    fn iter(&self) -> impl Iterator<Item = Candidate> + ExactSizeIterator + '_ {
+    fn iter(&self) -> impl ExactSizeIterator<Item = Candidate> + '_ {
         self.nearest.iter().copied()
     }
 }
