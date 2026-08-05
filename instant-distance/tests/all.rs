@@ -96,3 +96,85 @@ impl instant_distance::Point for Point {
         ((self.0 - other.0).powi(2) + (self.1 - other.1).powi(2)).sqrt()
     }
 }
+
+#[test]
+#[allow(clippy::float_cmp, clippy::approx_constant)]
+fn incremental_insert() {
+    let points = (0..4)
+        .map(|i| Point(i as f32, i as f32))
+        .collect::<Vec<_>>();
+    let values = vec!["zero", "one", "two", "three"];
+    let seed = ThreadRng::default().gen::<u64>();
+    let builder = Builder::default().seed(seed);
+
+    let mut map = builder.build(points, values);
+
+    map.insert(Point(4.0, 4.0), "four").expect("Should insert");
+
+    let mut search = Search::default();
+
+    for (i, item) in map.search(&Point(4.0, 4.0), &mut search).enumerate() {
+        match i {
+            0 => {
+                assert_eq!(item.distance, 0.0);
+                assert_eq!(item.value, &"four");
+            }
+            1 => {
+                assert_eq!(item.distance, 1.4142135);
+                assert!(item.value == &"three");
+            }
+            2 => {
+                assert_eq!(item.distance, 2.828427);
+                assert!(item.value == &"two");
+            }
+            3 => {
+                assert_eq!(item.distance, 4.2426405);
+                assert!(item.value == &"one");
+            }
+            4 => {
+                assert_eq!(item.distance, 5.656854);
+                assert!(item.value == &"zero");
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    // Note 
+    // This has the same expected results as incremental_insert but builds
+    // the whole map in one go. Only here for comparison.
+    {
+        let points = (0..5)
+            .map(|i| Point(i as f32, i as f32))
+            .collect::<Vec<_>>();
+        let values = vec!["zero", "one", "two", "three", "four"];
+        let seed = ThreadRng::default().gen::<u64>();
+        let builder = Builder::default().seed(seed);
+        let map = builder.build(points, values);
+        let mut search = Search::default();
+        for (i, item) in map.search(&Point(4.0, 4.0), &mut search).enumerate() {
+            match i {
+                0 => {
+                    assert_eq!(item.distance, 0.0);
+                    assert_eq!(item.value, &"four");
+                }
+                1 => {
+                    assert_eq!(item.distance, 1.4142135);
+                    assert!(item.value == &"three");
+                }
+                2 => {
+                    assert_eq!(item.distance, 2.828427);
+                    assert!(item.value == &"two");
+                }
+                3 => {
+                    assert_eq!(item.distance, 4.2426405);
+                    assert!(item.value == &"one");
+                }
+                4 => {
+                    assert_eq!(item.distance, 5.656854);
+                    assert!(item.value == &"zero");
+                }
+                _ => unreachable!(),
+            }
+        }
+    }
+}

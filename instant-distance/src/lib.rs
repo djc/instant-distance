@@ -170,6 +170,12 @@ where
     pub fn get(&self, i: usize, search: &Search) -> Option<MapItem<'_, P, V>> {
         Some(MapItem::from(self.hnsw.get(i, search)?, self))
     }
+
+    pub fn insert(&mut self, point: P, value: V) -> Result<PointId, Box<dyn std::error::Error>> {
+        let point_id = self.hnsw.insert(point, 100, Some(Heuristic::default()));
+        self.values.push(value);
+        Ok(point_id)
+    }
 }
 
 pub struct MapItem<'a, P, V> {
@@ -393,6 +399,55 @@ where
     #[doc(hidden)]
     pub fn get(&self, i: usize, search: &Search) -> Option<Item<'_, P>> {
         Some(Item::new(search.nearest.get(i).copied()?, self))
+    }
+
+    pub fn insert(
+        &mut self,
+        point: P,
+        ef_construction: usize,
+        heuristic: Option<Heuristic>,
+    ) -> PointId {
+        let new_pid = self.points.len();
+        let new_point_id = PointId(new_pid as u32);
+
+        self.points.push(point);
+        self.zero.push(ZeroNode::default());
+
+        let zeros = self
+            .zero
+            .iter()
+            .map(|z| RwLock::new(z.clone()))
+            .collect::<Vec<_>>();
+
+        let top = if self.layers.is_empty() {
+            LayerId(0)
+        } else {
+            LayerId(self.layers.len())
+        };
+
+        let construction = Construction {
+            zero: zeros.as_slice(),
+            pool: SearchPool::new(self.points.len()),
+            top,
+            points: self.points.as_slice(),
+            heuristic,
+            ef_construction,
+            #[cfg(feature = "indicatif")]
+            progress: None,
+            #[cfg(feature = "indicatif")]
+            done: AtomicUsize::new(0),
+        };
+
+        let new_layer = construction.top;
+        construction.insert(new_point_id, new_layer, &self.layers);
+
+        self.zero = construction
+            .zero
+            .iter()
+            .map(|node| node.read().clone())
+            .collect();
+
+        new_point_id
     }
 }
 
